@@ -10,7 +10,8 @@ Note that the script permutes the trainable parameters to NCHW format. This is a
 import argparse
 import os
 import numpy as np
-import tensorflow as tf
+# import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from tensorflow.python.platform import gfile
 
 strings_to_remove=["read", "/:0"]

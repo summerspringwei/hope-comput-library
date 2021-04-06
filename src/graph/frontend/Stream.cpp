@@ -49,6 +49,14 @@ void Stream::run()
     _manager.execute_graph(_g);
 }
 
+void Stream::run(int loop_count)
+{
+    for(int i=0; i<loop_count; ++i){
+        _manager.execute_graph(_g);
+    }
+}
+
+
 void Stream::add_layer(ILayer &layer)
 {
     auto nid   = layer.create_layer(*this);

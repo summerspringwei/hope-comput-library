@@ -31,6 +31,7 @@
 
 #include <limits>
 #include <string>
+#include <map>
 
 namespace arm_compute
 {
@@ -189,6 +190,7 @@ enum class NodeType
 
     Dummy
 };
+
 
 /** Backend Memory Manager affinity **/
 enum class MemoryManagerAffinity

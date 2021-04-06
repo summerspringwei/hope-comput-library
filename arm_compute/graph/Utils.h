@@ -27,6 +27,8 @@
 #include "arm_compute/graph/Graph.h"
 #include "arm_compute/graph/PassManager.h"
 
+#include <vector>
+
 namespace arm_compute
 {
 namespace graph
@@ -135,6 +137,19 @@ std::vector<NodeIdxPair> get_driving_nodes(const INode &node);
  * @param[in, out] tensor Tensor to configure
  */
 void configure_tensor(Tensor *tensor);
+
+/**
+ * Record task execution info
+*/
+struct CallStat {
+    std::string name;
+    std::string node_type_str;
+    std::string target_str;
+    std::vector<size_t> output_shape;
+    uint64_t start_micros;
+    uint64_t end_micros;
+};
+
 } // namespace graph
 } // namespace arm_compute
 #endif /* ARM_COMPUTE_GRAPH_UTILS_H */

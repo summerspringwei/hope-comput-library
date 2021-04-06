@@ -29,6 +29,7 @@
 #include "arm_compute/graph/Tensor.h"
 #include "arm_compute/graph/Utils.h"
 #include "arm_compute/graph/backends/BackendRegistry.h"
+#include "arm_compute/graph/TypesUtils.h"
 
 namespace arm_compute
 {
@@ -239,11 +240,23 @@ void call_all_tasks(ExecutionWorkload &workload)
             mm_ctx.second.cross_group->acquire();
         }
     }
-
+    std::vector<CallStat> run_profile;
     // Execute tasks
+    const std::chrono::time_point<std::chrono::high_resolution_clock> workload_start = std::chrono::high_resolution_clock::now();
     for(auto &task : workload.tasks)
     {
+        CallStat stat;
+        stat.name = task.node->name();
+        stat.node_type_str = get_node_type_string(task.node->type());
+        stat.target_str = get_target_string(task.node->assigned_target());
+        const std::chrono::time_point<std::chrono::high_resolution_clock> task_start = std::chrono::high_resolution_clock::now();
+        stat.start_micros = std::chrono::duration<double, std::micro>(task_start - workload_start).count();
+
         task();
+
+        const std::chrono::time_point<std::chrono::high_resolution_clock> task_end = std::chrono::high_resolution_clock::now();
+        stat.end_micros = std::chrono::duration<double, std::micro>(task_end - workload_start).count();
+        run_profile.push_back(stat);
     }
 
     // Release memory for the transition buffers
