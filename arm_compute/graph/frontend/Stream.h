@@ -27,7 +27,6 @@
 #include "arm_compute/graph/frontend/IStream.h"
 #include "arm_compute/graph/frontend/IStreamOperators.h"
 #include "arm_compute/graph/frontend/Types.h"
-#include "arm_compute/graph/Utils.h"
 
 #include "arm_compute/graph/Graph.h"
 #include "arm_compute/graph/GraphContext.h"
@@ -79,7 +78,6 @@ private:
     GraphContext _ctx;     /**< Graph context to use */
     GraphManager _manager; /**< Graph manager */
     Graph        _g;       /**< Internal graph representation of the stream */
-    std::vector<std::vector<CallStat>> _profiles;
 };
 } // namespace frontend
 } // namespace graph

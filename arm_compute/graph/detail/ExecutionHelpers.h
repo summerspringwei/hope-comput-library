@@ -117,6 +117,11 @@ void prepare_all_tasks(ExecutionWorkload &workload);
  * @param[in] workload Workload to execute
  */
 void call_all_tasks(ExecutionWorkload &workload);
+/** Write workload's profile info to disk
+ * 
+ * @param[in] workload Workload's profiles to save
+ * */
+bool dump_workload_profile(ExecutionWorkload &workload);
 } // namespace detail
 } // namespace graph
 } // namespace arm_compute

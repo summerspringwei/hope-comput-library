@@ -134,6 +134,43 @@ void GraphManager::execute_graph(Graph &graph)
     }
 }
 
+void GraphManager::execute_graph(Graph &graph, int loop_count)
+{
+    // Check if graph is finalized
+    auto it = _workloads.find(graph.id());
+    ARM_COMPUTE_ERROR_ON_MSG(it == std::end(_workloads), "Graph is not registered!");
+
+    while(true)
+    {
+        // Call input accessors
+        if(!detail::call_all_input_node_accessors(it->second))
+        {
+            return;
+        }
+        // const std::chrono::time_point<std::chrono::high_resolution_clock> start = std::chrono::high_resolution_clock::now();
+        auto start = std::chrono::steady_clock::now();
+        // Run graph loop_count times
+        for(int i=0; i<loop_count; ++i){
+            detail::call_all_tasks(it->second);
+        }
+        
+        auto end = std::chrono::steady_clock::now();
+        // const std::chrono::time_point<std::chrono::high_resolution_clock> end = std::chrono::high_resolution_clock::now();
+        // auto total_latency = std::chrono::duration<double, std::micro>(end - start).count();
+        auto total_latency = std::chrono::duration<double, std::micro>(end-start).count();
+        printf("Arm Compute library run %s %d times avg %f miliseconds", graph.name().c_str(), loop_count, total_latency / loop_count);
+        // Write profile info 
+        detail::dump_workload_profile(it->second);
+        
+        // Call output accessors
+        if(!detail::call_all_output_node_accessors(it->second))
+        {
+            return;
+        }
+    }
+}
+
+
 void GraphManager::invalidate_graph(Graph &graph)
 {
     auto it = _workloads.find(graph.id());

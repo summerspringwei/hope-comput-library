@@ -23,6 +23,8 @@
  */
 #include "arm_compute/graph/detail/ExecutionHelpers.h"
 
+#include <fstream>
+
 #include "arm_compute/graph/Graph.h"
 #include "arm_compute/graph/GraphContext.h"
 #include "arm_compute/graph/GraphManager.h"
@@ -30,6 +32,7 @@
 #include "arm_compute/graph/Utils.h"
 #include "arm_compute/graph/backends/BackendRegistry.h"
 #include "arm_compute/graph/TypesUtils.h"
+#include "arm_compute/runtime/CL/CLScheduler.h"
 
 namespace arm_compute
 {
@@ -253,12 +256,15 @@ void call_all_tasks(ExecutionWorkload &workload)
         stat.start_micros = std::chrono::duration<double, std::micro>(task_start - workload_start).count();
 
         task();
-
+        // backends::IDeviceBackend &backend         = backends::BackendRegistry::get().get_backend();
+        if(task.node->assigned_target()==Target::CL){
+            arm_compute::CLScheduler::get().queue().finish();
+        }
         const std::chrono::time_point<std::chrono::high_resolution_clock> task_end = std::chrono::high_resolution_clock::now();
         stat.end_micros = std::chrono::duration<double, std::micro>(task_end - workload_start).count();
         run_profile.push_back(stat);
     }
-
+    workload.profiles.push_back(run_profile);
     // Release memory for the transition buffers
     for(auto &mm_ctx : workload.ctx->memory_managers())
     {
@@ -280,6 +286,26 @@ bool call_all_output_node_accessors(ExecutionWorkload &workload)
 
     return is_valid;
 }
+
+bool dump_workload_profile(ExecutionWorkload &workload){
+    const std::string path = "/data/local/tmp/profile.txt";
+    std::ofstream file_profile(path, std::ios::out);
+    for(auto run_profile: workload.profiles){
+        int count = 0;
+        for(auto stat: run_profile){
+            char buf[1024];
+            sprintf(buf, "Iter %d: %s\t%s\t%s\t%lu\t%lu\t%lu\n", count,
+                stat.name.c_str(), stat.node_type_str.c_str(), stat.target_str.c_str(), 
+                stat.start_micros, stat.end_micros, (stat.end_micros - stat.start_micros));
+            file_profile.write(buf, std::strlen(buf));
+            count++;
+        }
+    }
+    file_profile.flush();
+    file_profile.close();
+    return true;
+}
+
 } // namespace detail
 } // namespace graph
 } // namespace arm_compute

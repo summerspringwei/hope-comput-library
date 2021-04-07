@@ -51,9 +51,7 @@ void Stream::run()
 
 void Stream::run(int loop_count)
 {
-    for(int i=0; i<loop_count; ++i){
-        _manager.execute_graph(_g);
-    }
+    _manager.execute_graph(_g, loop_count);   
 }
 
 

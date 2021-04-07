@@ -72,6 +72,12 @@ public:
      * @param[in] graph Graph to execute
      */
     void execute_graph(Graph &graph);
+    /** Executes a graph loop_count times
+     *
+     * @param[in] graph Graph to execute
+     * @param[in] loop_count times to execute
+     */
+    void execute_graph(Graph &graph, int loop_count);
     /** Invalidates the graph execution workload
      *
      * @param[in] graph Graph to invalidate

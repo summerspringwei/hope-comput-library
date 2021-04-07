@@ -186,6 +186,7 @@ public:
     {
         // Run graph
         graph.run();
+        graph.run(2);
     }
 
 private:

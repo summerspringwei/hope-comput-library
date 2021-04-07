@@ -28,6 +28,7 @@
 #include "arm_compute/graph/Tensor.h"
 #include "arm_compute/runtime/IFunction.h"
 #include "arm_compute/runtime/IMemoryGroup.h"
+#include "arm_compute/graph/Utils.h"
 
 #include <functional>
 #include <memory>
@@ -102,6 +103,7 @@ struct ExecutionWorkload
     std::vector<ExecutionTask> tasks   = {};          /**< Execution workload */
     Graph                     *graph   = { nullptr }; /**< Graph bound to the workload */
     GraphContext              *ctx     = { nullptr }; /**< Graph execution context */
+    std::vector<std::vector<CallStat>> profiles; /**< Profile tasks infomation */
 };
 } // namespace graph
 } // namespace arm_compute
