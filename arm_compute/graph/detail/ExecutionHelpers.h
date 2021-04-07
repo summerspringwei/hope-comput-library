@@ -117,6 +117,14 @@ void prepare_all_tasks(ExecutionWorkload &workload);
  * @param[in] workload Workload to execute
  */
 void call_all_tasks(ExecutionWorkload &workload);
+
+/**
+ * Read device placement file
+ * 
+ * @param[in] file_path device placement file path to read
+*/
+std::shared_ptr<std::map<std::string, Target>> read_device_map(const char * file_path);
+
 /** Write workload's profile info to disk
  * 
  * @param[in] workload Workload's profiles to save

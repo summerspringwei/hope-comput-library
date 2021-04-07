@@ -160,7 +160,8 @@ public:
         config.tuner_mode  = common_params.tuner_mode;
         config.tuner_file  = common_params.tuner_file;
         config.mlgo_file   = common_params.mlgo_file;
-
+        config.device_map_file = common_params.device_map_file;
+        
         // Load the precompiled kernels from a file into the kernel library, in this way the next time they are needed
         // compilation won't be required.
         if(common_params.enable_cl_cache)

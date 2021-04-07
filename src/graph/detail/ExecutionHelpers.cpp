@@ -24,6 +24,7 @@
 #include "arm_compute/graph/detail/ExecutionHelpers.h"
 
 #include <fstream>
+#include <sys/stat.h>
 
 #include "arm_compute/graph/Graph.h"
 #include "arm_compute/graph/GraphContext.h"
@@ -254,11 +255,12 @@ void call_all_tasks(ExecutionWorkload &workload)
         stat.target_str = get_target_string(task.node->assigned_target());
         const std::chrono::time_point<std::chrono::high_resolution_clock> task_start = std::chrono::high_resolution_clock::now();
         stat.start_micros = std::chrono::duration<double, std::micro>(task_start - workload_start).count();
-
+        
         task();
         // backends::IDeviceBackend &backend         = backends::BackendRegistry::get().get_backend();
         if(task.node->assigned_target()==Target::CL){
-            arm_compute::CLScheduler::get().queue().finish();
+            // arm_compute::CLScheduler::get().sync();
+            arm_compute::CLScheduler::get().wait();
         }
         const std::chrono::time_point<std::chrono::high_resolution_clock> task_end = std::chrono::high_resolution_clock::now();
         stat.end_micros = std::chrono::duration<double, std::micro>(task_end - workload_start).count();
@@ -286,6 +288,44 @@ bool call_all_output_node_accessors(ExecutionWorkload &workload)
 
     return is_valid;
 }
+
+bool fileExists(const char* filename)
+{
+    struct stat buf;
+    if (stat(filename, &buf) != -1)
+    {
+        return true;
+    }
+    return false;
+}
+
+std::shared_ptr<std::map<std::string, Target>> read_device_map(const char * file_path){
+    if(file_path == nullptr){
+        return nullptr;
+    }
+    if (!fileExists(file_path)) {
+        return nullptr;
+    }
+    std::ifstream infile(file_path, std::ifstream::in);
+    std::string node;
+    int64_t device;
+    std::shared_ptr<std::map<std::string, Target>> device_map_ptr(new std::map<std::string, Target>());
+    while (infile >> node >> device) {
+        Target target;
+        if(device==0){
+            target = Target::NEON;
+        }else if(device ==3){
+            target = Target::CL;
+        }else{
+            target = Target::NEON;
+        }
+        device_map_ptr->insert(std::pair<std::string, Target>(node, target));
+        printf("%s %ld\n", node.c_str(), device);
+    }
+    return device_map_ptr;
+}
+
+
 
 bool dump_workload_profile(ExecutionWorkload &workload){
     const std::string path = "/data/local/tmp/profile.txt";

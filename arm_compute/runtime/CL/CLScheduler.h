@@ -160,6 +160,11 @@ public:
 
     bool is_initialised() const;
 
+    /**
+     * Wait the kernels in command_queue to finish
+    */
+   void wait() const;
+
 private:
     void enqueue_common(ICLKernel &kernel, ITensorPack &tensors, bool flush);
     /** Flag to ensure symbols initialisation is happening before Scheduler creation */

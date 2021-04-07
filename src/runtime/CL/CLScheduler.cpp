@@ -190,4 +190,17 @@ void CLScheduler::enqueue_op(ICLKernel &kernel, ITensorPack &tensors, bool flush
 {
     enqueue_common(kernel, tensors, flush);
 }
+
+void CLScheduler::wait() const {
+    cl::Event mwait;
+    cl_int status;
+    status = clEnqueueMarker(_queue.get(), &(mwait()));
+    if(status != CL_SUCCESS){
+        ARM_COMPUTE_ERROR("In CLScheduler::wait clEnqueueMarker error\n");
+    }
+    status = clWaitForEvents(1, &(mwait()));
+    if(status != CL_SUCCESS){
+        ARM_COMPUTE_ERROR("In CLScheduler::wait clWaitForEvents error\n");
+    }
+}
 } // namespace arm_compute

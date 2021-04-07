@@ -50,7 +50,14 @@ void GraphManager::finalize_graph(Graph &graph, GraphContext &ctx, PassManager &
     {
         ARM_COMPUTE_ERROR("Graph is already registered!");
     }
-
+    // Get device placement
+    auto device_map_ptr = detail::read_device_map((const char*)ctx.config().device_map_file.c_str());
+    if(device_map_ptr == nullptr){
+        printf("Device placement is null\n");
+    }
+    for(std::map<std::string, Target>::iterator iter=device_map_ptr->begin(); iter != device_map_ptr->end(); iter++){
+        printf("%s %d\n", iter->first.c_str(), iter->second);
+    }
     // Apply IR mutating passes
     pm.run_type(graph, IGraphMutator::MutationType::IR);
 
@@ -153,7 +160,7 @@ void GraphManager::execute_graph(Graph &graph, int loop_count)
         for(int i=0; i<loop_count; ++i){
             detail::call_all_tasks(it->second);
         }
-        
+
         auto end = std::chrono::steady_clock::now();
         // const std::chrono::time_point<std::chrono::high_resolution_clock> end = std::chrono::high_resolution_clock::now();
         // auto total_latency = std::chrono::duration<double, std::micro>(end - start).count();

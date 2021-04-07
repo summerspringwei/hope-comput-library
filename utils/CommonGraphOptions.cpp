@@ -88,6 +88,7 @@ namespace utils
     os << "Tuner mode : " << common_params.tuner_mode << std::endl;
     os << "Tuner file : " << common_params.tuner_file << std::endl;
     os << "MLGO file : " << common_params.mlgo_file << std::endl;
+    os << "Device placement file : " << common_params.device_map_file << std::endl;
     os << "Fast math enabled? : " << (common_params.fast_math_hint == FastMathHint::Enabled ? true_str : false_str) << std::endl;
     if(!common_params.data_path.empty())
     {
@@ -131,7 +132,8 @@ CommonGraphOptions::CommonGraphOptions(CommandLineParser &parser)
       validation_path(parser.add_option<SimpleOption<std::string>>("validation-path")),
       validation_range(parser.add_option<SimpleOption<std::string>>("validation-range")),
       tuner_file(parser.add_option<SimpleOption<std::string>>("tuner-file")),
-      mlgo_file(parser.add_option<SimpleOption<std::string>>("mlgo-file"))
+      mlgo_file(parser.add_option<SimpleOption<std::string>>("mlgo-file")),
+      device_map_file(parser.add_option<SimpleOption<std::string>>("device-map-file"))
 {
     std::set<arm_compute::graph::Target> supported_targets
     {
@@ -186,6 +188,7 @@ CommonGraphOptions::CommonGraphOptions(CommandLineParser &parser)
     validation_range->set_help("Range of the images to validate for (Format : start,end)");
     tuner_file->set_help("File to load/save CLTuner values");
     mlgo_file->set_help("File to load MLGO heuristics");
+    device_map_file->set_help("File to load device placement");
 }
 
 CommonGraphParams consume_common_graph_parameters(CommonGraphOptions &options)
@@ -215,6 +218,7 @@ CommonGraphParams consume_common_graph_parameters(CommonGraphOptions &options)
     common_params.validation_range_end   = validation_range.second;
     common_params.tuner_file             = options.tuner_file->value();
     common_params.mlgo_file              = options.mlgo_file->value();
+    common_params.device_map_file        = options.device_map_file->value();
 
     return common_params;
 }
