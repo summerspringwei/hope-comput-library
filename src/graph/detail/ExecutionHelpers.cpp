@@ -271,7 +271,7 @@ void unmap_node(INode *node){
 void call_all_tasks(ExecutionWorkload &workload)
 {
     ARM_COMPUTE_ERROR_ON(workload.ctx == nullptr);
-
+    auto execution_type = workload.ctx->config().execution_type;
     // Acquire memory for the transition buffers
     for(auto &mm_ctx : workload.ctx->memory_managers())
     {
@@ -291,11 +291,11 @@ void call_all_tasks(ExecutionWorkload &workload)
         stat.target_str = get_target_string(task.node->assigned_target());
         const std::chrono::time_point<std::chrono::high_resolution_clock> task_start = std::chrono::high_resolution_clock::now();
         stat.start_micros = std::chrono::duration<double, std::micro>(task_start - workload_start).count();
-        if(stat.name == "pool5"){
-            printf("pool5\n");
-        }
+
         // Blocking map input and output tensors if needed
-        if(task.node->assigned_target() == Target::NEON){
+        if((execution_type == ExecutionType::EXECUTION_TYPE_PARALLEL
+            || execution_type == ExecutionType::EXECUTION_TYPE_SERIAL_HYBRID)
+            && task.node->assigned_target() == Target::NEON){
             map_node(task.node);
         }
         printf("Start %s\n", stat.name.c_str());
@@ -306,7 +306,9 @@ void call_all_tasks(ExecutionWorkload &workload)
             arm_compute::CLScheduler::get().wait();
         }
         // TODO(Chunwei Xia) Does not unmap the edge if not needed
-        if(task.node->assigned_target() == Target::NEON){
+        if((execution_type == ExecutionType::EXECUTION_TYPE_PARALLEL
+            || execution_type == ExecutionType::EXECUTION_TYPE_SERIAL_HYBRID)
+            && task.node->assigned_target() == Target::NEON){
             unmap_node(task.node);
         }
         

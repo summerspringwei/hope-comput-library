@@ -75,6 +75,18 @@ constexpr NodeID EmptyNodeID = std::numeric_limits<NodeID>::max();
 /**< Constant EdgeID specifying an equivalent of null edge */
 constexpr EdgeID EmptyEdgeID = std::numeric_limits<EdgeID>::max();
 
+/** Model Execution type */
+enum class ExecutionType {
+    /* DEFAULT: Execute units in serial using CPU or GPU backend */
+    EXECUTION_TYPE_DEFAULT,
+    /* SERIAL_HYBRID: Execute units in serial, but execute one unit on CPU or GPU backend */
+    EXECUTION_TYPE_SERIAL_HYBRID,
+    /* PARALLEL: Execute units in parallel using CPU and GPU */
+    EXECUTION_TYPE_PARALLEL,
+    /* BIG_LITTEL: Execute units in parallel using big cores and little core, Not Support yet */
+    EXECUTION_TYPE_BIG_LITTLE,
+};
+
 // Forward declarations
 struct TensorDescriptor;
 /** Graph configuration structure */
@@ -89,6 +101,7 @@ struct GraphConfig
     int         num_threads{ -1 };                     /**< Number of threads to use (thread capable backends), if 0 the backend will auto-initialize, if -1 the backend will stay as it is. */
     std::string tuner_file{ "acl_tuner.csv" };         /**< File to load/store tuning values from */
     std::string mlgo_file{ "heuristics.mlgo" };        /**< Filename to load MLGO heuristics from */
+    ExecutionType execution_type {ExecutionType::EXECUTION_TYPE_DEFAULT}; /** Graph execution type*/
     std::string device_map_file{ "" };                 /**< Filename to load device placement from */
 };
 

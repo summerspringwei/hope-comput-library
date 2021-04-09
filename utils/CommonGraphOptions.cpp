@@ -88,6 +88,7 @@ namespace utils
     os << "Tuner mode : " << common_params.tuner_mode << std::endl;
     os << "Tuner file : " << common_params.tuner_file << std::endl;
     os << "MLGO file : " << common_params.mlgo_file << std::endl;
+    os << "Execution type: " << common_params.execution_type << std::endl;
     os << "Device placement file : " << common_params.device_map_file << std::endl;
     os << "Fast math enabled? : " << (common_params.fast_math_hint == FastMathHint::Enabled ? true_str : false_str) << std::endl;
     if(!common_params.data_path.empty())
@@ -133,6 +134,7 @@ CommonGraphOptions::CommonGraphOptions(CommandLineParser &parser)
       validation_range(parser.add_option<SimpleOption<std::string>>("validation-range")),
       tuner_file(parser.add_option<SimpleOption<std::string>>("tuner-file")),
       mlgo_file(parser.add_option<SimpleOption<std::string>>("mlgo-file")),
+      execution_type(),
       device_map_file(parser.add_option<SimpleOption<std::string>>("device-map-file"))
 {
     std::set<arm_compute::graph::Target> supported_targets
@@ -162,10 +164,18 @@ CommonGraphOptions::CommonGraphOptions(CommandLineParser &parser)
         CLTunerMode::RAPID
     };
 
+    const std::set<ExecutionType> supported_execution_types{
+        ExecutionType::EXECUTION_TYPE_DEFAULT,
+        ExecutionType::EXECUTION_TYPE_SERIAL_HYBRID,
+        ExecutionType::EXECUTION_TYPE_PARALLEL,
+        ExecutionType::EXECUTION_TYPE_BIG_LITTLE
+    };
+
     target      = parser.add_option<EnumOption<Target>>("target", supported_targets, Target::NEON);
     data_type   = parser.add_option<EnumOption<DataType>>("type", supported_data_types, DataType::F32);
     data_layout = parser.add_option<EnumOption<DataLayout>>("layout", supported_data_layouts);
     tuner_mode  = parser.add_option<EnumOption<CLTunerMode>>("tuner-mode", supported_tuner_modes, CLTunerMode::NORMAL);
+    execution_type = parser.add_option<EnumOption<ExecutionType>>("execution-type", supported_execution_types, ExecutionType::EXECUTION_TYPE_DEFAULT);
 
     help->set_help("Show this help message");
     threads->set_help("Number of threads to use");
@@ -188,6 +198,7 @@ CommonGraphOptions::CommonGraphOptions(CommandLineParser &parser)
     validation_range->set_help("Range of the images to validate for (Format : start,end)");
     tuner_file->set_help("File to load/save CLTuner values");
     mlgo_file->set_help("File to load MLGO heuristics");
+    execution_type->set_help("Execution type to run DNN models");
     device_map_file->set_help("File to load device placement");
 }
 
@@ -218,8 +229,8 @@ CommonGraphParams consume_common_graph_parameters(CommonGraphOptions &options)
     common_params.validation_range_end   = validation_range.second;
     common_params.tuner_file             = options.tuner_file->value();
     common_params.mlgo_file              = options.mlgo_file->value();
+    common_params.execution_type         = options.execution_type->value();
     common_params.device_map_file        = options.device_map_file->value();
-
     return common_params;
 }
 } // namespace utils

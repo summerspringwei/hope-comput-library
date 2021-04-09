@@ -30,6 +30,7 @@
 #include "arm_compute/graph/TypeLoader.h"
 #include "arm_compute/graph/TypePrinter.h"
 #include "arm_compute/runtime/CL/CLTunerTypes.h"
+#include "arm_compute/graph/Types.h"
 
 namespace arm_compute
 {
@@ -112,6 +113,7 @@ struct CommonGraphParams
     unsigned int                     validation_range_start{ 0 };
     unsigned int                     validation_range_end{ std::numeric_limits<unsigned int>::max() };
     std::string                      device_map_file{};
+    arm_compute::graph::ExecutionType    execution_type {arm_compute::graph::ExecutionType::EXECUTION_TYPE_DEFAULT};
 };
 
 /** Formatted output of the CommonGraphParams type
@@ -168,7 +170,8 @@ public:
     SimpleOption<std::string>              *validation_range; /**< Validation range */
     SimpleOption<std::string>              *tuner_file;       /**< File to load/store the tuner's values from */
     SimpleOption<std::string>              *mlgo_file;        /**< File to load the MLGO heuristics from */
-    SimpleOption<std::string>              *device_map_file;        /**< File to load the device placement from*/
+    EnumOption<arm_compute::graph::ExecutionType> *execution_type; /**< Graph execution type */
+    SimpleOption<std::string>              *device_map_file;  /**< File to load the device placement from*/
 };
 
 /** Consumes the common graph options and creates a structure containing any information

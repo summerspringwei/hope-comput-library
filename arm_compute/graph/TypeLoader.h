@@ -78,6 +78,23 @@ inline ::std::istream &operator>>(::std::istream &stream, Target &target)
     return stream;
 }
 
+ExecutionType execution_type_from_name(std::string &name);
+
+/** Input Stream operator for @ref ExecutionType
+ *
+ * @param[in]  stream Stream to parse
+ * @param[out] execution_type Output execution_type
+ *
+ * @return Updated stream
+ */
+inline ::std::istream &operator>>(::std::istream &stream, ExecutionType &execution_type)
+{
+    std::string value;
+    stream >> value;
+    execution_type = execution_type_from_name(value);
+    return stream;
+}
+
 /** Converts a string to a strong types enumeration @ref ConvolutionMethod
  *
  * @param[in] name String to convert
@@ -123,6 +140,8 @@ inline ::std::istream &operator>>(::std::istream &stream, DepthwiseConvolutionMe
     target = depthwise_convolution_method_from_name(value);
     return stream;
 }
+
+
 
 } // namespace graph
 } // namespace arm_compute

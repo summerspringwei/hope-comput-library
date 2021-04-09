@@ -267,6 +267,32 @@ inline ::std::ostream &operator<<(::std::ostream &os, const FastMathHint &hint)
     return os;
 }
 
+
+/** Formatted output of the execution type. */
+inline ::std::ostream &operator<<(::std::ostream &os, const ExecutionType &execution_type)
+{
+    switch(execution_type)
+    {
+        case ExecutionType::EXECUTION_TYPE_DEFAULT:
+            os << "Execution_default";
+            break;
+        case ExecutionType::EXECUTION_TYPE_SERIAL_HYBRID:
+            os << "Execution_serial_hybrid";
+            break;
+        case ExecutionType::EXECUTION_TYPE_PARALLEL:
+            os << "Execution_parallel";
+            break;
+        case ExecutionType::EXECUTION_TYPE_BIG_LITTLE:
+            os << "Execution_big_little";
+            break;
+        default:
+            ARM_COMPUTE_ERROR("NOT_SUPPORTED!");
+    }
+
+    return os;
+}
+
+
 /** Formatted output of the DepthwiseConvolutionMethod type. */
 inline ::std::ostream &operator<<(::std::ostream &os, const DepthwiseConvolutionMethod &method)
 {

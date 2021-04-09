@@ -77,6 +77,30 @@ Target target_from_name(const std::string &name)
 #endif /* ARM_COMPUTE_EXCEPTIONS_DISABLED */
 }
 
+ExecutionType execution_type_from_name(std::string &name){
+    static const std::map<std::string, ExecutionType> execution_types =
+    {
+        { "default", ExecutionType::EXECUTION_TYPE_DEFAULT },
+        { "serial_hybrid", ExecutionType::EXECUTION_TYPE_SERIAL_HYBRID },
+        { "parallel", ExecutionType::EXECUTION_TYPE_PARALLEL },
+        { "big_little", ExecutionType::EXECUTION_TYPE_BIG_LITTLE}
+    };
+
+#ifndef ARM_COMPUTE_EXCEPTIONS_DISABLED
+    try
+    {
+#endif /* ARM_COMPUTE_EXCEPTIONS_DISABLED */
+        return execution_types.at(arm_compute::utility::tolower(name));
+
+#ifndef ARM_COMPUTE_EXCEPTIONS_DISABLED
+    }
+    catch(const std::out_of_range &)
+    {
+        throw std::invalid_argument(name);
+    }
+#endif /* ARM_COMPUTE_EXCEPTIONS_DISABLED */
+}
+
 ConvolutionMethod Convolution_method_from_name(const std::string &name)
 {
     static const std::map<std::string, ConvolutionMethod> methods =
