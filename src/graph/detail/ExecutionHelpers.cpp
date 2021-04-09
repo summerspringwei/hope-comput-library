@@ -231,6 +231,42 @@ void prepare_all_tasks(ExecutionWorkload &workload)
         release_unused_tensors(*workload.graph);
     }
 }
+/**Map all the input and output tensors
+ * @param[in] node: The node to map tensors
+*/
+void map_node(INode *node){
+    for(auto edge_idx: node->input_edges()){
+        auto edge = node->graph()->edge(edge_idx);
+        if(edge->tensor()->desc().target != node->assigned_target()){
+            edge->tensor()->handle()->map(true);
+            printf("map in %p\n", (void*)(edge->tensor()->handle()->tensor().buffer()));
+        }
+    }
+    for(auto edge_idx: node->output_edges()){
+        auto edge = node->graph()->edge(edge_idx);
+        if(edge->tensor()->desc().target != node->assigned_target()){
+            edge->tensor()->handle()->map(true);
+            edge->tensor()->handle()->tensor().buffer();
+            printf("map out %p\n", (void*)(edge->tensor()->handle()->tensor().buffer()));
+        }
+    }
+}
+
+void unmap_node(INode *node){
+    for(auto edge_idx: node->input_edges()){
+        auto edge = node->graph()->edge(edge_idx);
+        if(edge->tensor()->desc().target != node->assigned_target()){
+            edge->tensor()->handle()->unmap();
+        }
+    }
+    for(auto edge_idx: node->output_edges()){
+        auto edge = node->graph()->edge(edge_idx);
+        if(edge->tensor()->desc().target != node->assigned_target()){
+            edge->tensor()->handle()->unmap();
+        }
+    }
+}
+
 
 void call_all_tasks(ExecutionWorkload &workload)
 {
@@ -255,13 +291,25 @@ void call_all_tasks(ExecutionWorkload &workload)
         stat.target_str = get_target_string(task.node->assigned_target());
         const std::chrono::time_point<std::chrono::high_resolution_clock> task_start = std::chrono::high_resolution_clock::now();
         stat.start_micros = std::chrono::duration<double, std::micro>(task_start - workload_start).count();
-        
+        if(stat.name == "pool5"){
+            printf("pool5\n");
+        }
+        // Blocking map input and output tensors if needed
+        if(task.node->assigned_target() == Target::NEON){
+            map_node(task.node);
+        }
+        printf("Start %s\n", stat.name.c_str());
         task();
-        // backends::IDeviceBackend &backend         = backends::BackendRegistry::get().get_backend();
+        printf("End %s\n", stat.name.c_str());
         if(task.node->assigned_target()==Target::CL){
             // arm_compute::CLScheduler::get().sync();
             arm_compute::CLScheduler::get().wait();
         }
+        // TODO(Chunwei Xia) Does not unmap the edge if not needed
+        if(task.node->assigned_target() == Target::NEON){
+            unmap_node(task.node);
+        }
+        
         const std::chrono::time_point<std::chrono::high_resolution_clock> task_end = std::chrono::high_resolution_clock::now();
         stat.end_micros = std::chrono::duration<double, std::micro>(task_end - workload_start).count();
         run_profile.push_back(stat);

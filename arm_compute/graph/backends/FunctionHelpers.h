@@ -61,7 +61,7 @@ typename TargetInfo::TensorType *get_backing_tensor(arm_compute::graph::Tensor *
     typename TargetInfo::TensorType *backing_tensor = nullptr;
     if(tensor != nullptr)
     {
-        ARM_COMPUTE_ERROR_ON(tensor->desc().target != TargetInfo::TargetType);
+        // ARM_COMPUTE_ERROR_ON(tensor->desc().target != TargetInfo::TargetType);
         // Get backing tensor handle
         ITensorHandle *tensor_handle = tensor->handle();
         // Get backing tensor

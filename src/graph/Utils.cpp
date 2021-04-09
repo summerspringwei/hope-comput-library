@@ -23,14 +23,18 @@
  */
 #include "arm_compute/graph/Utils.h"
 
+#include <sstream>
+
 #include "arm_compute/graph/GraphContext.h"
 #include "arm_compute/graph/backends/BackendRegistry.h"
 #include "arm_compute/graph/mutators/GraphMutators.h"
+
 
 namespace arm_compute
 {
 namespace graph
 {
+    extern std::string get_target_string(Target);
 bool is_target_supported(Target target)
 {
     return backends::BackendRegistry::get().contains(target) && backends::BackendRegistry::get().find_backend(target)->is_backend_supported();
@@ -72,6 +76,98 @@ void force_target_to_graph(Graph &g, Target target)
             tensor->desc().target = target;
         }
     }
+}
+
+void force_target_to_graph(Graph &g, Target target, std::shared_ptr<std::map<std::string, Target>> device_map_ptr){
+    auto &nodes = g.nodes();
+    // Firstly, we set all the node according to device map
+    for(auto &node : nodes){
+        if(node){
+            if(device_map_ptr != nullptr && device_map_ptr->find(node.get()->name()) != device_map_ptr->end()) {
+                auto mapped_target = device_map_ptr->at(node.get()->name());
+                node->set_assigned_target(mapped_target);// Set node target
+            }else {
+                node->set_assigned_target(target);
+            }
+        }
+    }
+    // Then, for const node, we set its target as its consumer
+    for(auto &node : nodes){
+        if(node){
+            if(node.get()->type() == NodeType::Const){
+                ARM_COMPUTE_ERROR_ON(node.get()->output_edges().size() != 1);
+                for(auto edge_idx: node.get()->output_edges()){
+                    auto edge = node.get()->graph()->edge(edge_idx);
+                    node.get()->set_assigned_target(edge->consumer()->assigned_target());
+                }
+            }
+        }
+    }
+    if(device_map_ptr == nullptr){
+        auto &tensors = g.tensors();
+        for(auto &tensor : tensors)
+        {
+            if(tensor)
+            {
+                tensor->desc().target = target;
+            }
+        }
+    }
+    configure_graph_tensors_heter(g);
+}
+
+void configure_graph_tensors_heter(Graph &g){
+    auto &nodes = g.nodes();
+    for(auto &node : nodes){
+        if(node){
+            std::stringstream strstream;
+            strstream << node.get()->name() + " precudure: ";
+            if(node.get()->assigned_target() == Target::CL || node.get()->assigned_target() == Target::GC){
+                // Set all input and output tensors' target to CL
+                for(auto edge_idx: node.get()->input_edges()){
+                    auto edge = node.get()->graph()->edge(edge_idx);
+                    strstream << edge->producer()->name() + " ";
+                    edge->tensor()->desc().target = node.get()->assigned_target();
+                }
+                strstream << " || successor: ";
+                for(auto edge_idx: node.get()->output_edges()){
+                    auto edge = node.get()->graph()->edge(edge_idx);
+                    strstream << edge->consumer()->name() + " ";
+                    edge->tensor()->desc().target = node.get()->assigned_target();
+                }
+            }else{
+                // Set the tensor on the edge to Target::NEON
+                // if and only if the both the producer and consumer are Target::NEON
+                for(auto edge_idx: node.get()->input_edges()){
+                    auto edge = node.get()->graph()->edge(edge_idx);
+                    strstream << edge->producer()->name() + " ";
+                    if(edge->producer()->assigned_target() == Target::NEON){
+                        edge->tensor()->desc().target = Target::NEON;
+                    }
+                }
+                strstream << " || successor: ";
+                for(auto edge_idx: node.get()->output_edges()){
+                    auto edge = node.get()->graph()->edge(edge_idx);
+                    strstream << edge->consumer()->name() + " ";
+                    if(edge->consumer()->assigned_target() == Target::NEON){
+                        edge->tensor()->desc().target = Target::NEON;
+                    }
+                }    
+            }
+            strstream << "\n";
+            printf("%s", strstream.str().c_str());
+        }
+    }
+    // Print edge 
+    auto &edges = g.edges();
+    std::stringstream strstream;
+    for(auto &edge: edges){
+        strstream << edge->id();
+        strstream << ": ";
+        strstream << edge->producer()->name();
+        strstream << " " + get_target_string(edge->tensor()->desc().target) + " ";
+        strstream << edge->consumer()->name() <<"\n";
+    }printf("%s", strstream.str().c_str());
 }
 
 PassManager create_default_pass_manager(Target target, const GraphConfig &cfg)
@@ -119,6 +215,13 @@ void setup_requested_backend_context(GraphContext &ctx, Target target)
         }
     }
 }
+
+void setup_neon_and_cl_backend_context(GraphContext &ctx)
+{
+    setup_requested_backend_context(ctx, Target::NEON);
+    setup_requested_backend_context(ctx, Target::CL);
+}
+
 
 size_t get_dimension_size(const TensorDescriptor &descriptor, const DataLayoutDimension data_layout_dimension)
 {

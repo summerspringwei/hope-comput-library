@@ -1,0 +1,13 @@
+conv1 0
+norm1 0
+pool1 0
+conv2 3
+norm2 3
+pool2 3
+conv3 0
+conv4 0
+conv5 0
+pool5 0
+fc6 3
+fc7 3
+fc8 3

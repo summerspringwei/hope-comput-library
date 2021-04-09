@@ -54,9 +54,10 @@ void GraphManager::finalize_graph(Graph &graph, GraphContext &ctx, PassManager &
     auto device_map_ptr = detail::read_device_map((const char*)ctx.config().device_map_file.c_str());
     if(device_map_ptr == nullptr){
         printf("Device placement is null\n");
-    }
-    for(std::map<std::string, Target>::iterator iter=device_map_ptr->begin(); iter != device_map_ptr->end(); iter++){
-        printf("%s %d\n", iter->first.c_str(), iter->second);
+    }else{
+        for(std::map<std::string, Target>::iterator iter=device_map_ptr->begin(); iter != device_map_ptr->end(); iter++){
+            printf("%s %d\n", iter->first.c_str(), iter->second);
+        }
     }
     // Apply IR mutating passes
     pm.run_type(graph, IGraphMutator::MutationType::IR);
@@ -69,17 +70,20 @@ void GraphManager::finalize_graph(Graph &graph, GraphContext &ctx, PassManager &
         forced_target = get_default_target();
         ARM_COMPUTE_LOG_GRAPH_INFO("Switching target from " << target << " to " << forced_target << std::endl);
     }
-    force_target_to_graph(graph, forced_target);
+    // force_target_to_graph(graph, forced_target);
+    force_target_to_graph(graph, forced_target, device_map_ptr);
 
     // Setup backend context
     // TODO (COMPMID-2014) : Setup all backends needed by the graph
-    setup_requested_backend_context(ctx, forced_target);
+    // Done by Chunwei Xia
+    // setup_requested_backend_context(ctx, forced_target);
+    setup_neon_and_cl_backend_context(ctx);
 
     // Configure all tensors
     detail::configure_all_tensors(graph);
 
     // Apply backend mutating passes
-    pm.run_type(graph, IGraphMutator::MutationType::Backend);
+    // pm.run_type(graph, IGraphMutator::MutationType::Backend);
 
     // Perform topological sort
     std::vector<NodeID> topological_sorted_nodes = dfs(graph);

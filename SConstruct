@@ -368,7 +368,8 @@ if env['opencl'] or env['gles_compute']:
 if env['debug']:
     env['asserts'] = True
     env['logging'] = True
-    env.Append(CXXFLAGS = ['-O0','-g','-gdwarf-2'])
+    # env.Append(CXXFLAGS = ['-O0','-g','-gdwarf-2'])
+    env.Append(CXXFLAGS = ['-O0','-g'])
     env.Append(CPPDEFINES = ['ARM_COMPUTE_DEBUG_ENABLED'])
 else:
     env.Append(CXXFLAGS = ['-O3'])

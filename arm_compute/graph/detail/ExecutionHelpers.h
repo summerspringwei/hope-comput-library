@@ -78,6 +78,18 @@ void allocate_all_tensors(Graph &g);
  * @return The execution workload
  */
 ExecutionWorkload configure_all_nodes(Graph &g, GraphContext &ctx, const std::vector<NodeID> &node_order);
+/** Configures all nodes of graph according to device map
+ *
+ * @param[in, out] g          Graph to configure the nodes
+ * @param[in]      ctx        Graph context to use
+ * @param[in]      node_order The order to configure the nodes
+ * @param[in]      device_map The device placement map for all the nodes
+ *
+ * @return The execution workload
+ */
+ExecutionWorkload configure_all_nodes(Graph &g, GraphContext &ctx, const std::vector<NodeID> &node_order, 
+                                        std::shared_ptr<std::map<std::string, Target>> device_map);
+
 /** Release the memory of all unused const nodes
  *
  * @param[in] g Graph to release the memory from

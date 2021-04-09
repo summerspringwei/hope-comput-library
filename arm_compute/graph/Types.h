@@ -80,9 +80,9 @@ struct TensorDescriptor;
 /** Graph configuration structure */
 struct GraphConfig
 {
-    bool        use_function_memory_manager{ true };   /**< Use a memory manager to manage per-function auxilary memory */
-    bool        use_function_weights_manager{ true };  /**< Use a weights manager to manage transformed weights */
-    bool        use_transition_memory_manager{ true }; /**< Use a memory manager to manager transition buffer memory */
+    bool        use_function_memory_manager{ false };   /**< Use a memory manager to manage per-function auxilary memory */
+    bool        use_function_weights_manager{ false };  /**< Use a weights manager to manage transformed weights */
+    bool        use_transition_memory_manager{ false }; /**< Use a memory manager to manager transition buffer memory */
     bool        use_tuner{ false };                    /**< Use a tuner in tunable backends */
     bool        convert_to_uint8{ false };             /**< Convert graph to a synthetic uint8 graph */
     CLTunerMode tuner_mode{ CLTunerMode::EXHAUSTIVE }; /**< Tuner mode to be used by the CL tuner */

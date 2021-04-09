@@ -90,6 +90,16 @@ Target get_default_target();
  * @param[in] target Target to force
  */
 void force_target_to_graph(Graph &g, Target target);
+/** Forces a target to node according to device map
+ *
+ * @param[in] g      Graph to force target on
+ * @param[in] target Target to force
+ */
+void force_target_to_graph(Graph &g, Target target, std::shared_ptr<std::map<std::string, Target>> device_map_ptr);
+/** Set the CL node's input and output tensors to CL
+ * 
+*/
+void configure_graph_tensors_heter(Graph &g);
 /** Creates a default @ref PassManager
  *
  * @param[in] target Target to create the pass manager for
@@ -104,6 +114,11 @@ PassManager create_default_pass_manager(Target target, const GraphConfig &cfg);
  * @param[in]     target Target to setup the backend for.
  */
 void setup_requested_backend_context(GraphContext &ctx, Target target);
+/** Setups Neon and CL backends.
+ *
+ * @param[in,out] ctx    Graph Context.
+ */
+void setup_neon_and_cl_backend_context(GraphContext &ctx);
 /** Default releases the graph context if not done manually
  *
  * @param[in,out] ctx Graph Context
