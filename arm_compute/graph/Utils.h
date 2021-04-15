@@ -96,6 +96,11 @@ void force_target_to_graph(Graph &g, Target target);
  * @param[in] target Target to force
  */
 void force_target_to_graph(Graph &g, Target target, std::shared_ptr<std::map<std::string, Target>> device_map_ptr);
+
+/** Set the target of all the tensors in graph when runs in heterogenous way
+ * @param[in] g     Graph to set all of it's tensor
+*/
+void configure_graph_tensors_heterogenous(Graph &g);
 /** Set the CL node's input and output tensors to CL
  * 
 */

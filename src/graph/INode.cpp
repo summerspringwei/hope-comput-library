@@ -36,7 +36,7 @@ namespace graph
 // clang-format off
 INode::INode()
     : _graph(nullptr), _id(EmptyNodeID), _common_params({ "", Target::UNSPECIFIED}),
-      _outputs(), _input_edges(), _output_edges(), _assigned_target(Target::UNSPECIFIED)
+      _outputs(), _input_edges(), _output_edges(), _assigned_target(Target::UNSPECIFIED), _executed(false)
 {
 }
 // clang-format on

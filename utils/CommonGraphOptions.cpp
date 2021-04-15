@@ -90,6 +90,7 @@ namespace utils
     os << "MLGO file : " << common_params.mlgo_file << std::endl;
     os << "Execution type: " << common_params.execution_type << std::endl;
     os << "Device placement file : " << common_params.device_map_file << std::endl;
+    os << "Num runs: " << common_params.num_runs << std::endl;
     os << "Fast math enabled? : " << (common_params.fast_math_hint == FastMathHint::Enabled ? true_str : false_str) << std::endl;
     if(!common_params.data_path.empty())
     {
@@ -135,7 +136,8 @@ CommonGraphOptions::CommonGraphOptions(CommandLineParser &parser)
       tuner_file(parser.add_option<SimpleOption<std::string>>("tuner-file")),
       mlgo_file(parser.add_option<SimpleOption<std::string>>("mlgo-file")),
       execution_type(),
-      device_map_file(parser.add_option<SimpleOption<std::string>>("device-map-file"))
+      device_map_file(parser.add_option<SimpleOption<std::string>>("device-map-file")),
+      num_runs(parser.add_option<SimpleOption<int>>("num_runs", 1))
 {
     std::set<arm_compute::graph::Target> supported_targets
     {
@@ -200,6 +202,7 @@ CommonGraphOptions::CommonGraphOptions(CommandLineParser &parser)
     mlgo_file->set_help("File to load MLGO heuristics");
     execution_type->set_help("Execution type to run DNN models");
     device_map_file->set_help("File to load device placement");
+    num_runs->set_help("Number of times that graph runs");
 }
 
 CommonGraphParams consume_common_graph_parameters(CommonGraphOptions &options)
@@ -231,6 +234,7 @@ CommonGraphParams consume_common_graph_parameters(CommonGraphOptions &options)
     common_params.mlgo_file              = options.mlgo_file->value();
     common_params.execution_type         = options.execution_type->value();
     common_params.device_map_file        = options.device_map_file->value();
+    common_params.num_runs               = options.num_runs->value();
     return common_params;
 }
 } // namespace utils

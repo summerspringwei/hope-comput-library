@@ -41,6 +41,8 @@ void execute_task(ExecutionTask &task)
     if(task.task)
     {
         task.task->run();
+        // Mark the node as executed
+        task.node->set_executed(true);
     }
 #ifdef ARM_COMPUTE_ASSERTS_ENABLED
     // COMPMID-3012 - Hide the printing logic from the execute_task method in the graph API

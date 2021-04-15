@@ -34,6 +34,7 @@ namespace graph
 class Graph;
 class GraphContext;
 struct ExecutionWorkload;
+struct ExecutionTask;
 class Tensor;
 class INode;
 
@@ -89,6 +90,12 @@ ExecutionWorkload configure_all_nodes(Graph &g, GraphContext &ctx, const std::ve
  */
 ExecutionWorkload configure_all_nodes(Graph &g, GraphContext &ctx, const std::vector<NodeID> &node_order, 
                                         std::shared_ptr<std::map<std::string, Target>> device_map);
+/** Find whether all the precedent nodes has been executed
+ * @param[in]     task        Task contains the node
+ * 
+ * @return whether the node in task has been executed
+ */
+bool ready_to_execute(ExecutionTask &task);
 
 /** Release the memory of all unused const nodes
  *
@@ -137,11 +144,18 @@ void call_all_tasks(ExecutionWorkload &workload);
 */
 std::shared_ptr<std::map<std::string, Target>> read_device_map(const char * file_path);
 
+/** Write graph's topology info to disk
+ * 
+ * @param[in] g ExecutionWorkload's graph's topology info to save
+ * */
+bool dump_graph_info(ExecutionWorkload& g);
+
 /** Write workload's profile info to disk
  * 
  * @param[in] workload Workload's profiles to save
  * */
 bool dump_workload_profile(ExecutionWorkload &workload);
+
 } // namespace detail
 } // namespace graph
 } // namespace arm_compute

@@ -79,17 +79,41 @@ public:
                                   get_weights_accessor(data_path, "/cnn_data/inceptionv3_model/Conv2d_1a_3x3_weights.npy", weights_layout),
                                   std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(2, 2, 0, 0))
               .set_name("Conv2d_1a_3x3/convolution")
+              << BatchNormalizationLayer(get_weights_accessor(data_path,
+                                                              "/cnn_data/inceptionv3_model/Conv2d_1a_3x3_BatchNorm_moving_mean.npy"),
+                                         get_weights_accessor(data_path,
+                                                              "/cnn_data/inceptionv3_model/Conv2d_1a_3x3_BatchNorm_moving_variance.npy"),
+                                         nullptr, get_weights_accessor(data_path,
+                                                                       "/cnn_data/inceptionv3_model/Conv2d_1a_3x3_BatchNorm_beta.npy"),
+                                         0.001f)
+              .set_name("Conv2d_1a_3x3/BatchNorm/batchnorm")
               << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Conv2d_1a_3x3/Relu")
               << ConvolutionLayer(3U, 3U, 32U,
                                   get_weights_accessor(data_path, "/cnn_data/inceptionv3_model/Conv2d_2a_3x3_weights.npy", weights_layout),
                                   std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
               .set_name("Conv2d_2a_3x3/convolution")
+              << BatchNormalizationLayer(get_weights_accessor(data_path,
+                                                              "/cnn_data/inceptionv3_model/Conv2d_2a_3x3_BatchNorm_moving_mean.npy"),
+                                         get_weights_accessor(data_path,
+                                                              "/cnn_data/inceptionv3_model/Conv2d_2a_3x3_BatchNorm_moving_variance.npy"),
+                                         nullptr, get_weights_accessor(data_path,
+                                                                       "/cnn_data/inceptionv3_model/Conv2d_2a_3x3_BatchNorm_beta.npy"),
+                                         0.001f)
+              .set_name("Conv2d_2a_3x3/BatchNorm/batchnorm")
               << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Conv2d_2a_3x3/Relu")
 
               << ConvolutionLayer(3U, 3U, 64U,
                                   get_weights_accessor(data_path, "/cnn_data/inceptionv3_model/Conv2d_2b_3x3_weights.npy", weights_layout),
                                   std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 1, 1))
               .set_name("Conv2d_2b_3x3/convolution")
+              << BatchNormalizationLayer(get_weights_accessor(data_path,
+                                                              "/cnn_data/inceptionv3_model/Conv2d_2b_3x3_BatchNorm_moving_mean.npy"),
+                                         get_weights_accessor(data_path,
+                                                              "/cnn_data/inceptionv3_model/Conv2d_2b_3x3_BatchNorm_moving_variance.npy"),
+                                         nullptr, get_weights_accessor(data_path,
+                                                                       "/cnn_data/inceptionv3_model/Conv2d_2b_3x3_BatchNorm_beta.npy"),
+                                         0.001f)
+              .set_name("Conv2d_2b_3x3/BatchNorm/batchnorm")
               << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Conv2d_2b_3x3/Relu")
 
               << PoolingLayer(PoolingLayerInfo(PoolingType::MAX, 3, operation_layout, PadStrideInfo(2, 2, 0, 0, DimensionRoundingType::CEIL))).set_name("MaxPool_3a_3x3/MaxPool")
@@ -98,12 +122,28 @@ public:
                                   get_weights_accessor(data_path, "/cnn_data/inceptionv3_model/Conv2d_3b_1x1_weights.npy", weights_layout),
                                   std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
               .set_name("Conv2d_3b_1x1/convolution")
+              << BatchNormalizationLayer(get_weights_accessor(data_path,
+                                                              "/cnn_data/inceptionv3_model/Conv2d_3b_1x1_BatchNorm_moving_mean.npy"),
+                                         get_weights_accessor(data_path,
+                                                              "/cnn_data/inceptionv3_model/Conv2d_3b_1x1_BatchNorm_moving_variance.npy"),
+                                         nullptr, get_weights_accessor(data_path,
+                                                                       "/cnn_data/inceptionv3_model/Conv2d_3b_1x1_BatchNorm_beta.npy"),
+                                         0.001f)
+              .set_name("Conv2d_3b_1x1/BatchNorm/batchnorm")
               << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Conv2d_3b_1x1/Relu")
 
               << ConvolutionLayer(3U, 3U, 192U,
                                   get_weights_accessor(data_path, "/cnn_data/inceptionv3_model/Conv2d_4a_3x3_weights.npy", weights_layout),
                                   std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
               .set_name("Conv2d_4a_3x3/convolution")
+              << BatchNormalizationLayer(get_weights_accessor(data_path,
+                                                              "/cnn_data/inceptionv3_model/Conv2d_4a_3x3_BatchNorm_moving_mean.npy"),
+                                         get_weights_accessor(data_path,
+                                                              "/cnn_data/inceptionv3_model/Conv2d_4a_3x3_BatchNorm_moving_variance.npy"),
+                                         nullptr, get_weights_accessor(data_path,
+                                                                       "/cnn_data/inceptionv3_model/Conv2d_4a_3x3_BatchNorm_beta.npy"),
+                                         0.001f)
+              .set_name("Conv2d_4a_3x3/BatchNorm/batchnorm")
               << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Conv2d_4a_3x3/Relu")
 
               << PoolingLayer(PoolingLayerInfo(PoolingType::MAX, 3, operation_layout, PadStrideInfo(2, 2, 0, 0, DimensionRoundingType::CEIL))).set_name("MaxPool_5a_3x3/MaxPool");
@@ -163,8 +203,6 @@ public:
         config.tuner_file       = common_params.tuner_file;
         config.mlgo_file        = common_params.mlgo_file;
         config.convert_to_uint8 = (common_params.data_type == DataType::QASYMM8);
-        config.execution_type   = common_params.execution_type;
-        config.device_map_file  = common_params.device_map_file;
 
         graph.finalize(common_params.target, config);
 
@@ -209,6 +247,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 0, 0))
             .set_name(param_path + "/Branch_0/Conv2d_0a_1x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_0a_1x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_0a_1x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_0a_1x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_0/Conv2d_0a_1x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_0/Conv2d_0a_1x1/Relu");
 
         SubStream i_b(graph);
@@ -218,6 +263,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 0, 0))
             .set_name(param_path + "/Branch_1/Conv2d" + conv_id0 + "1x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d" + conv_id0 + "1x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d" + conv_id0 + "1x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d" + conv_id0 + "1x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_1/Conv2d" + conv_id0 + "1x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d" + conv_id0 + "1x1/Relu")
             << ConvolutionLayer(
                 5U, 5U, std::get<1>(b_filters),
@@ -225,6 +277,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 2, 2))
             .set_name(param_path + "/Branch_1/Conv2d" + conv_id1 + "5x5/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv" + conv_id1 + "5x5_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv" + conv_id1 + "5x5_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv" + conv_id1 + "5x5_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_1/Conv2d" + conv_id1 + "5x5/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d" + conv_id1 + "5x5/Relu");
 
         SubStream i_c(graph);
@@ -234,6 +293,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 0, 0))
             .set_name(param_path + "/Branch_2/Conv2d_0a_1x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0a_1x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0a_1x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0a_1x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_2/Conv2d_0a_1x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0a_1x1/Relu")
             << ConvolutionLayer(
                 3U, 3U, std::get<1>(c_filters),
@@ -241,6 +307,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 1, 1))
             .set_name(param_path + "/Branch_2/Conv2d_0b_3x3/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0b_3x3_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0b_3x3_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0b_3x3_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_2/Conv2d_0b_3x3/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0b_3x3/Relu")
             << ConvolutionLayer(
                 3U, 3U, std::get<2>(c_filters),
@@ -248,6 +321,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 1, 1))
             .set_name(param_path + "/Branch_2/Conv2d_0c_3x3/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0c_3x3_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0c_3x3_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0c_3x3_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_2/Conv2d_0c_3x3/BatchNorm/batcnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0c_3x3/Relu");
 
         SubStream i_d(graph);
@@ -260,6 +340,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 0, 0))
             .set_name(param_path + "/Branch_3/Conv2d_0b_1x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_3_Conv2d_0b_1x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_3_Conv2d_0b_1x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_3_Conv2d_0b_1x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_3/Conv2d_0b_1x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_3/Conv2d_0b_1x1/Relu");
 
         return ConcatLayer(std::move(i_a), std::move(i_b), std::move(i_c), std::move(i_d));
@@ -277,6 +364,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(2, 2, 0, 0))
             .set_name(param_path + "/Branch_0/Conv2d_1a_1x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_1a_1x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_1a_1x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_1a_1x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_0/Conv2d_1a_1x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_0/Conv2d_1a_1x1/Relu");
 
         SubStream i_b(graph);
@@ -286,6 +380,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 0, 0))
             .set_name(param_path + "/Branch_1/Conv2d_0a_1x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0a_1x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0a_1x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0a_1x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_1/Conv2d_0a_1x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d_0a_1x1/Relu")
             << ConvolutionLayer(
                 3U, 3U, std::get<1>(b_filters),
@@ -293,6 +394,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 1, 1))
             .set_name(param_path + "/Branch_1/Conv2d_0b_3x3/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0b_3x3_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0b_3x3_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0b_3x3_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_1/Conv2d_0b_3x3/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d_0b_3x3/Relu")
             << ConvolutionLayer(
                 3U, 3U, std::get<2>(b_filters),
@@ -300,6 +408,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(2, 2, 0, 0))
             .set_name(param_path + "/Branch_1/Conv2d_1a_1x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_1a_1x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_1a_1x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_1a_1x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_1/Conv2d_1a_1x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d_1a_1x1/Relu");
 
         SubStream i_c(graph);
@@ -322,6 +437,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 0, 0))
             .set_name(param_path + "/Branch_0/Conv2d_0a_1x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_0a_1x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_0a_1x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_0a_1x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_0/Conv2d_0a_1x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_0/Conv2d_0a_1x1/Relu");
 
         SubStream i_b(graph);
@@ -331,6 +453,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 0, 0))
             .set_name(param_path + "/Branch_1/Conv2d_0a_1x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0a_1x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0a_1x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0a_1x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_1/Conv2d_0a_1x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d_0a_1x1/Relu")
             << ConvolutionLayer(
                 7U, 1U, std::get<1>(b_filters),
@@ -338,6 +467,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 3, 0))
             .set_name(param_path + "/Branch_1/Conv2d_0b_1x7/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0b_1x7_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0b_1x7_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0b_1x7_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_1/Conv2d_0b_1x7/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d_0b_1x7/Relu")
             << ConvolutionLayer(
                 1U, 7U, std::get<2>(b_filters),
@@ -345,6 +481,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 0, 3))
             .set_name(param_path + "/Branch_1/Conv2d_0c_7x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0c_7x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0c_7x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0c_7x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_1/Conv2d_0c_7x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_0/Conv2d_0c_7x1/Relu");
 
         SubStream i_c(graph);
@@ -354,6 +497,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 0, 0))
             .set_name(param_path + "/Branch_2/Conv2d_0a_1x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0a_1x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0a_1x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0a_1x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_2/Conv2d_0a_1x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0a_1x1/Relu")
             << ConvolutionLayer(
                 1U, 7U, std::get<1>(c_filters),
@@ -361,6 +511,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 0, 3))
             .set_name(param_path + "/Branch_2/Conv2d_0b_7x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0b_7x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0b_7x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0b_7x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_2/Conv2d_0b_7x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0b_7x1/Relu")
             << ConvolutionLayer(
                 7U, 1U, std::get<2>(c_filters),
@@ -368,6 +525,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 3, 0))
             .set_name(param_path + "/Branch_2/Conv2d_0c_1x7/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0c_1x7_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0c_1x7_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0c_1x7_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_2/Conv2d_0c_1x7/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0c_1x7/Relu")
             << ConvolutionLayer(
                 1U, 7U, std::get<3>(c_filters),
@@ -375,6 +539,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 0, 3))
             .set_name(param_path + "/Branch_2/Conv2d_0d_7x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0d_7x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0d_7x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0d_7x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_2/Conv2d_0d_7x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0d_7x1/Relu")
             << ConvolutionLayer(
                 7U, 1U, std::get<4>(c_filters),
@@ -382,6 +553,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 3, 0))
             .set_name(param_path + "/Branch_2/Conv2d_0e_1x7/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0e_1x7_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0e_1x7_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0e_1x7_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_2/Conv2d_0e_1x7/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0e_1x7/Relu");
 
         SubStream i_d(graph);
@@ -394,6 +572,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 0, 0))
             .set_name(param_path + "/Branch_3/Conv2d_0b_1x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_3_Conv2d_0b_1x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_3_Conv2d_0b_1x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_3_Conv2d_0b_1x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_3/Conv2d_0b_1x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_3/Conv2d_0b_1x1/Relu");
 
         return ConcatLayer(std::move(i_a), std::move(i_b), std::move(i_c), std::move(i_d));
@@ -411,6 +596,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 0, 0))
             .set_name(param_path + "/Branch_0/Conv2d_0a_1x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_0a_1x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_0a_1x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_0a_1x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_0/Conv2d_0a_1x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_0/Conv2d_0a_1x1/Relu")
             << ConvolutionLayer(
                 3U, 3U, std::get<1>(a_filters),
@@ -418,6 +610,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(2, 2, 0, 0))
             .set_name(param_path + "/Branch_0/Conv2d_1a_3x3/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_1a_3x3_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_1a_3x3_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_1a_3x3_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_0/Conv2d_1a_3x3/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_0/Conv2d_1a_3x3/Relu");
 
         SubStream i_b(graph);
@@ -427,6 +626,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 0, 0))
             .set_name(param_path + "/Branch_1/Conv2d_0a_1x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0a_1x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0a_1x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0a_1x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_1/Conv2d_0a_1x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d_0a_1x1/Relu")
             << ConvolutionLayer(
                 7U, 1U, std::get<1>(b_filters),
@@ -434,6 +640,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 3, 0))
             .set_name(param_path + "/Branch_1/Conv2d_0b_1x7/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0b_1x7_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0b_1x7_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0b_1x7_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_1/Conv2d_0b_1x7/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d_0b_1x7/Relu")
             << ConvolutionLayer(
                 1U, 7U, std::get<2>(b_filters),
@@ -441,6 +654,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 0, 3))
             .set_name(param_path + "/Branch_1/Conv2d_0c_7x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0c_7x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0c_7x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0c_7x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_1/Conv2d_0c_7x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d_0c_7x1/Relu")
             << ConvolutionLayer(
                 3U, 3U, std::get<3>(b_filters),
@@ -448,6 +668,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(2, 2, 0, 0))
             .set_name(param_path + "/Branch_1/Conv2d_1a_3x3/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_1a_3x3_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_1a_3x3_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_1a_3x3_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_1/Conv2d_1a_3x3/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d_1a_3x3/Relu");
 
         SubStream i_c(graph);
@@ -478,6 +705,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 0, 0))
             .set_name(param_path + "/Branch_0/Conv2d_0a_1x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_0a_1x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_0a_1x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_0a_1x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_0/Conv2d_0a_1x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_0/Conv2d_0a_1x1/Relu");
 
         SubStream i_b(graph);
@@ -487,6 +721,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 0, 0))
             .set_name(param_path + "/Branch_1/Conv2d_0a_1x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0a_1x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0a_1x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0a_1x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_1/Conv2d_0a_1x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d_0a_1x1/Relu");
 
         SubStream i_b1(i_b);
@@ -496,6 +737,13 @@ private:
                  std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                  PadStrideInfo(1, 1, 1, 0))
              .set_name(param_path + "/Branch_1/Conv2d_0b_1x3/convolution")
+             << BatchNormalizationLayer(
+                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0b_1x3_BatchNorm_moving_mean.npy"),
+                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0b_1x3_BatchNorm_moving_variance.npy"),
+                 nullptr,
+                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0b_1x3_BatchNorm_beta.npy"),
+                 0.001f)
+             .set_name(param_path + "/Branch_1/Conv2d_0b_1x3/BatchNorm/batchnorm")
              << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d_0b_1x3/Relu");
 
         SubStream i_b2(i_b);
@@ -505,6 +753,13 @@ private:
                  std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                  PadStrideInfo(1, 1, 0, 1))
              .set_name(param_path + "/Branch_1/Conv2d" + conv_id + "3x1/convolution")
+             << BatchNormalizationLayer(
+                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d" + conv_id + "3x1_BatchNorm_moving_mean.npy"),
+                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d" + conv_id + "3x1_BatchNorm_moving_variance.npy"),
+                 nullptr,
+                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d" + conv_id + "3x1_BatchNorm_beta.npy"),
+                 0.001f)
+             .set_name(param_path + "/Branch_1/Conv2d" + conv_id + "3x1/BatchNorm/batchnorm")
              << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d" + conv_id + "3x1/Relu");
 
         // Merge b1 and b2
@@ -517,6 +772,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 0, 0))
             .set_name(param_path + "/Branch_2/Conv2d_0a_1x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0a_1x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0a_1x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0a_1x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_2/Conv2d_0a_1x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0a_1x1/Relu")
             << ConvolutionLayer(
                 3U, 3U, std::get<1>(c_filters),
@@ -524,6 +786,12 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 1, 1))
             .set_name(param_path + "/Branch_2/Conv2d_0b_3x3/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0b_3x3_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0b_3x3_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0b_3x3_BatchNorm_beta.npy"),
+                0.001f)
             .set_name(param_path + "/Branch_2/Conv2d_0b_3x3/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0b_3x3/Relu");
 
@@ -534,6 +802,13 @@ private:
                  std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                  PadStrideInfo(1, 1, 1, 0))
              .set_name(param_path + "/Branch_2/Conv2d_0c_1x3/convolution")
+             << BatchNormalizationLayer(
+                 get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0c_1x3_BatchNorm_moving_mean.npy"),
+                 get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0c_1x3_BatchNorm_moving_variance.npy"),
+                 nullptr,
+                 get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0c_1x3_BatchNorm_beta.npy"),
+                 0.001f)
+             .set_name(param_path + "/Branch_2/Conv2d_0c_1x3/BatchNorm/batchnorm")
              << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0c_1x3/Relu");
 
         SubStream i_c2(i_c);
@@ -543,6 +818,13 @@ private:
                  std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                  PadStrideInfo(1, 1, 0, 1))
              .set_name(param_path + "/Branch_2/Conv2d_0d_3x1/convolution")
+             << BatchNormalizationLayer(
+                 get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0d_3x1_BatchNorm_moving_mean.npy"),
+                 get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0d_3x1_BatchNorm_moving_variance.npy"),
+                 nullptr,
+                 get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0d_3x1_BatchNorm_beta.npy"),
+                 0.001f)
+             .set_name(param_path + "/Branch_2/Conv2d_0d_3x1/BatchNorm/batchnorm")
              << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0d_3x1/Relu");
 
         // Merge i_c1 and i_c2
@@ -558,6 +840,13 @@ private:
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
                 PadStrideInfo(1, 1, 0, 0))
             .set_name(param_path + "/Branch_3/Conv2d_0b_1x1/convolution")
+            << BatchNormalizationLayer(
+                get_weights_accessor(data_path, total_path + "Branch_3_Conv2d_0b_1x1_BatchNorm_moving_mean.npy"),
+                get_weights_accessor(data_path, total_path + "Branch_3_Conv2d_0b_1x1_BatchNorm_moving_variance.npy"),
+                nullptr,
+                get_weights_accessor(data_path, total_path + "Branch_3_Conv2d_0b_1x1_BatchNorm_beta.npy"),
+                0.001f)
+            .set_name(param_path + "/Branch_3/Conv2d_0b_1x1/BatchNorm/batchnorm")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_3/Conv2d_0b_1x1/Relu");
 
         return ConcatLayer(std::move(i_a), std::move(i_b), std::move(i_c), std::move(i_d));

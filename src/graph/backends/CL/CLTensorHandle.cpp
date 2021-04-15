@@ -35,6 +35,7 @@ CLTensorHandle::CLTensorHandle(const ITensorInfo &info)
     : _tensor()
 {
     _tensor.allocator()->init(info);
+    _mapped.store(false);
 }
 
 void CLTensorHandle::allocate()
@@ -57,12 +58,18 @@ void CLTensorHandle::manage(IMemoryGroup *mg)
 
 void CLTensorHandle::map(bool blocking)
 {
-    _tensor.map(blocking);
+    if(_mapped.load()==false){
+        _tensor.map(blocking);
+        _mapped.store(true);
+    }
 }
 
 void CLTensorHandle::unmap()
 {
-    _tensor.unmap();
+    if(_mapped.load()==true){
+        _tensor.unmap();
+        _mapped.store(false);
+    }
 }
 
 void CLTensorHandle::release_if_unused()

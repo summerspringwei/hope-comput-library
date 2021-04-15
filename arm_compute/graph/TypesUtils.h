@@ -10,8 +10,8 @@ namespace graph
 
 static std::map<Target, std::string> target_to_str_map = {
     {Target::UNSPECIFIED, "UNSPECIFIED"},
-    {Target::NEON, "NEON"},
-    {Target::CL, "CL"},
+    {Target::NEON, "CPU"},
+    {Target::CL, "OpenCL"},
     {Target::GC, "GC"}
 };
 

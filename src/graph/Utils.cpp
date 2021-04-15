@@ -113,8 +113,57 @@ void force_target_to_graph(Graph &g, Target target, std::shared_ptr<std::map<std
             }
         }
     }
-    configure_graph_tensors_heter(g);
+    // configure_graph_tensors_heter(g);
+    configure_graph_tensors_heterogenous(g);
 }
+
+void configure_graph_tensors_heterogenous(Graph &g){
+    /** A tensor's target will be set to Neon if and only if
+     * (1) it is weights and its only consumer's target is Neon
+     * (2) else all of its producer and its consumer's target are Neon
+     */
+    auto& tensors = g.tensors();
+    for(auto& tensor_ptr: tensors){
+        auto edge_indexes = tensor_ptr->bound_edges();
+        bool is_special_weight = false;
+        if(edge_indexes.size()==1){
+            auto it=edge_indexes.begin();
+            auto edge = g.edge(*it);
+            ARM_COMPUTE_ERROR_ON(edge==nullptr);
+            if(edge != nullptr){
+                if(edge->producer()==nullptr ||
+                    (edge->producer()->type() == NodeType::Const 
+                    || edge->producer()->type() == NodeType::Input)){
+                    tensor_ptr->desc().target = edge->consumer()->assigned_target();
+                    is_special_weight = true;
+                }
+            }
+        }
+        if(!is_special_weight){
+            bool can_assign_to_neon = true;
+            for(auto it=edge_indexes.begin(); it!=edge_indexes.end(); ++it){
+                auto edge = g.edge(*it);
+                if(edge==nullptr){
+                    continue;
+                }
+                if((edge->producer() != nullptr && edge->producer()->assigned_target()==Target::CL)
+                   || (edge->consumer()!=nullptr && edge->consumer()->assigned_target()==Target::CL)){
+                    can_assign_to_neon = false;
+                    break;
+                }
+            }
+            if(can_assign_to_neon){
+                tensor_ptr->desc().target = Target::NEON;
+            }else{
+                tensor_ptr->desc().target = Target::CL;
+            }
+        }
+    }
+    for(auto& tensor_ptr: tensors){
+        printf("tensor %d\n", tensor_ptr->desc().target);
+    }
+}
+
 
 void configure_graph_tensors_heter(Graph &g){
     auto &nodes = g.nodes();
@@ -126,23 +175,35 @@ void configure_graph_tensors_heter(Graph &g){
                 // Set all input and output tensors' target to CL
                 for(auto edge_idx: node.get()->input_edges()){
                     auto edge = node.get()->graph()->edge(edge_idx);
-                    strstream << edge->producer()->name() + " ";
-                    edge->tensor()->desc().target = node.get()->assigned_target();
+                    if(edge != nullptr){
+                        edge->tensor()->desc().target = node.get()->assigned_target();    
+                        if(edge->producer() != nullptr){
+                            strstream << edge->producer()->name() + " ";
+                        }
+                    }
                 }
                 strstream << " || successor: ";
                 for(auto edge_idx: node.get()->output_edges()){
                     auto edge = node.get()->graph()->edge(edge_idx);
-                    strstream << edge->consumer()->name() + " ";
-                    edge->tensor()->desc().target = node.get()->assigned_target();
+                    if(edge != nullptr){
+                        edge->tensor()->desc().target = node.get()->assigned_target();    
+                        if(edge->consumer() != nullptr){
+                            strstream << edge->consumer()->name() + " ";
+                        }
+                    }
                 }
             }else{
                 // Set the tensor on the edge to Target::NEON
                 // if and only if the both the producer and consumer are Target::NEON
                 for(auto edge_idx: node.get()->input_edges()){
                     auto edge = node.get()->graph()->edge(edge_idx);
-                    strstream << edge->producer()->name() + " ";
-                    if(edge->producer()->assigned_target() == Target::NEON){
-                        edge->tensor()->desc().target = Target::NEON;
+                    if(edge != nullptr){
+                        if(edge->producer() != nullptr){
+                            strstream << edge->producer()->name() + " ";
+                        }
+                        if(edge->producer() != nullptr && edge->producer()->assigned_target() == Target::NEON){
+                            edge->tensor()->desc().target = Target::NEON;
+                        }
                     }
                 }
                 strstream << " || successor: ";
@@ -152,7 +213,7 @@ void configure_graph_tensors_heter(Graph &g){
                     if(edge->consumer()->assigned_target() == Target::NEON){
                         edge->tensor()->desc().target = Target::NEON;
                     }
-                }    
+                }
             }
             strstream << "\n";
             printf("%s", strstream.str().c_str());

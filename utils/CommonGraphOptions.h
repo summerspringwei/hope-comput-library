@@ -114,6 +114,7 @@ struct CommonGraphParams
     unsigned int                     validation_range_end{ std::numeric_limits<unsigned int>::max() };
     std::string                      device_map_file{};
     arm_compute::graph::ExecutionType    execution_type {arm_compute::graph::ExecutionType::EXECUTION_TYPE_DEFAULT};
+    int                              num_runs {1};
 };
 
 /** Formatted output of the CommonGraphParams type
@@ -172,6 +173,7 @@ public:
     SimpleOption<std::string>              *mlgo_file;        /**< File to load the MLGO heuristics from */
     EnumOption<arm_compute::graph::ExecutionType> *execution_type; /**< Graph execution type */
     SimpleOption<std::string>              *device_map_file;  /**< File to load the device placement from*/
+    SimpleOption<int>                      *num_runs;         /**< Number of Graph runs */
 };
 
 /** Consumes the common graph options and creates a structure containing any information

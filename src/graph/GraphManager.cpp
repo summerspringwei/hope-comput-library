@@ -23,6 +23,8 @@
  */
 #include "arm_compute/graph/GraphManager.h"
 
+#include <mutex>
+
 #include "arm_compute/graph/Graph.h"
 #include "arm_compute/graph/GraphContext.h"
 #include "arm_compute/graph/Logger.h"
@@ -120,9 +122,11 @@ void GraphManager::finalize_graph(Graph &graph, GraphContext &ctx, PassManager &
 
     // Finalize Graph context
     ctx.finalize();
-
+    
     // Register graph
     _workloads.insert(std::make_pair(graph.id(), std::move(workload)));
+    std::once_flag flag;
+    std::call_once(flag, detail::dump_graph_info, workload);
     ARM_COMPUTE_LOG_GRAPH_VERBOSE("Created workload for graph with ID : " << graph.id() << std::endl);
 }
 
@@ -131,7 +135,7 @@ void GraphManager::execute_graph(Graph &graph)
     // Check if graph is finalized
     auto it = _workloads.find(graph.id());
     ARM_COMPUTE_ERROR_ON_MSG(it == std::end(_workloads), "Graph is not registered!");
-
+    
     while(true)
     {
         // Call input accessors
@@ -156,7 +160,8 @@ void GraphManager::execute_graph(Graph &graph, int loop_count)
     // Check if graph is finalized
     auto it = _workloads.find(graph.id());
     ARM_COMPUTE_ERROR_ON_MSG(it == std::end(_workloads), "Graph is not registered!");
-
+    std::once_flag flag;
+    std::call_once(flag, detail::dump_graph_info, it->second);
     while(true)
     {
         // Call input accessors

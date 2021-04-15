@@ -240,6 +240,20 @@ public:
      * @return Assigned target of this node
      */
     Target assigned_target() const;
+    /**
+     * @brief Return whether the node has been executed
+     * @return True if executed by TaskExecutor
+     */
+    bool executed(){
+        return _executed;
+    }
+    /**
+     * @brief 
+     * 
+     */
+    void set_executed(bool e){
+        _executed = e;
+    }
 
 protected:
     friend class Graph;
@@ -252,6 +266,7 @@ protected:
     std::vector<EdgeID>   _input_edges;     /**< Inputs edge set */
     std::set<EdgeID>      _output_edges;    /**< Output edge set */
     Target                _assigned_target; /**< Assigned target by the Graph executor */
+    bool                  _executed;        /** Whether the task has been executed */
 };
 } // namespace graph
 } // namespace arm_compute

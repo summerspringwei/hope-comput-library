@@ -65,6 +65,7 @@ public:
 
 private:
     arm_compute::CLTensor _tensor; /**< Backend Tensor */
+    std::atomic_bool _mapped;       /**< Whether mapped */
 };
 } // namespace backends
 } // namespace graph

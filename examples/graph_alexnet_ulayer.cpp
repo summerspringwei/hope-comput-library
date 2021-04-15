@@ -29,6 +29,7 @@
 #include "utils/CommonGraphOptions.h"
 #include "utils/GraphUtils.h"
 #include "utils/Utils.h"
+#include "arm_compute/graph/ULayer.h"
 
 using namespace arm_compute;
 using namespace arm_compute::utils;
@@ -36,10 +37,10 @@ using namespace arm_compute::graph::frontend;
 using namespace arm_compute::graph_utils;
 
 /** Example demonstrating how to implement AlexNet's network using the Compute Library's graph API */
-class GraphAlexnetExample : public Example
+class GraphAlexnetUlayerExample : public Example
 {
 public:
-    GraphAlexnetExample()
+    GraphAlexnetUlayerExample()
         : cmd_parser(), common_opts(cmd_parser), common_params(), graph(0, "AlexNet")
     {
     }
@@ -84,12 +85,10 @@ public:
               << common_params.fast_math_hint
               << InputLayer(input_descriptor, get_input_accessor(common_params, std::move(preprocessor)))
               // Layer 1
-              << ConvolutionLayer(
-                  11U, 11U, 96U,
+              << UConvolutionLayer(graph, 11U, 11U, 96U,
                   get_weights_accessor(data_path, "/cnn_data/alexnet_model/conv1_w.npy", weights_layout),
                   get_weights_accessor(data_path, "/cnn_data/alexnet_model/conv1_b.npy"),
-                  PadStrideInfo(4, 4, 0, 0))
-              .set_name("conv1")
+                  PadStrideInfo(4, 4, 0, 0), 1, 0.25, "conv1")
               << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("relu1")
               << NormalizationLayer(NormalizationLayerInfo(NormType::CROSS_MAP, 5, 0.0001f, 0.75f)).set_name("norm1")
               << PoolingLayer(PoolingLayerInfo(PoolingType::MAX, 3, operation_layout, PadStrideInfo(2, 2, 0, 0))).set_name("pool1")
@@ -216,5 +215,5 @@ private:
  */
 int main(int argc, char **argv)
 {
-    return arm_compute::utils::run_example<GraphAlexnetExample>(argc, argv);
+    return arm_compute::utils::run_example<GraphAlexnetUlayerExample>(argc, argv);
 }

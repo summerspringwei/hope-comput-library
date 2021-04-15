@@ -274,16 +274,16 @@ inline ::std::ostream &operator<<(::std::ostream &os, const ExecutionType &execu
     switch(execution_type)
     {
         case ExecutionType::EXECUTION_TYPE_DEFAULT:
-            os << "Execution_default";
+            os << "default";
             break;
         case ExecutionType::EXECUTION_TYPE_SERIAL_HYBRID:
-            os << "Execution_serial_hybrid";
+            os << "serial_hybrid";
             break;
         case ExecutionType::EXECUTION_TYPE_PARALLEL:
-            os << "Execution_parallel";
+            os << "parallel";
             break;
         case ExecutionType::EXECUTION_TYPE_BIG_LITTLE:
-            os << "Execution_big_little";
+            os << "big_little";
             break;
         default:
             ARM_COMPUTE_ERROR("NOT_SUPPORTED!");
