@@ -136,7 +136,11 @@ void prepare_all_tasks(ExecutionWorkload &workload);
  * @param[in] workload Workload to execute
  */
 void call_all_tasks(ExecutionWorkload &workload);
-
+/** Executes all tasks of a workload on CPU and GPU in parallel
+ *
+ * @param[in] workload Workload to execute
+ */
+void call_all_tasks_parallel(ExecutionWorkload &workload);
 /**
  * Read device placement file
  * 

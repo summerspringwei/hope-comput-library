@@ -145,8 +145,14 @@ void GraphManager::execute_graph(Graph &graph)
         }
 
         // Run graph
-        detail::call_all_tasks(it->second);
-
+        auto execution_type = it->second.ctx->config().execution_type;
+        if(execution_type == ExecutionType::EXECUTION_TYPE_DEFAULT
+            || execution_type == ExecutionType::EXECUTION_TYPE_SERIAL_HYBRID){
+            detail::call_all_tasks(it->second);
+        }else if(execution_type == ExecutionType::EXECUTION_TYPE_PARALLEL){
+            detail::call_all_tasks_parallel(it->second);
+        }
+        
         // Call output accessors
         if(!detail::call_all_output_node_accessors(it->second))
         {
@@ -172,10 +178,18 @@ void GraphManager::execute_graph(Graph &graph, int loop_count)
         // const std::chrono::time_point<std::chrono::high_resolution_clock> start = std::chrono::high_resolution_clock::now();
         auto start = std::chrono::steady_clock::now();
         // Run graph loop_count times
-        for(int i=0; i<loop_count; ++i){
-            detail::call_all_tasks(it->second);
+        // Run graph
+        auto execution_type = it->second.ctx->config().execution_type;
+        if(execution_type == ExecutionType::EXECUTION_TYPE_DEFAULT
+            || execution_type == ExecutionType::EXECUTION_TYPE_SERIAL_HYBRID){
+            for(int i=0; i<loop_count; ++i){
+                detail::call_all_tasks(it->second);
+            }
+        }else if(execution_type == ExecutionType::EXECUTION_TYPE_PARALLEL){
+            for(int i=0; i<loop_count; ++i){
+                detail::call_all_tasks_parallel(it->second);
+            }
         }
-
         auto end = std::chrono::steady_clock::now();
         // const std::chrono::time_point<std::chrono::high_resolution_clock> end = std::chrono::high_resolution_clock::now();
         // auto total_latency = std::chrono::duration<double, std::micro>(end - start).count();

@@ -41,7 +41,7 @@
 #include "arm_compute/graph/backends/BackendRegistry.h"
 #include "arm_compute/graph/TypesUtils.h"
 #include "arm_compute/runtime/CL/CLScheduler.h"
-
+#include "arm_compute/core/Log.h"
 
 namespace arm_compute
 {
@@ -306,16 +306,9 @@ void call_all_tasks(ExecutionWorkload &workload)
     const std::chrono::time_point<std::chrono::high_resolution_clock> workload_start = std::chrono::high_resolution_clock::now();
     for(auto &task : workload.tasks)
     {
-        CallStat stat;
-        stat.name = task.node->name();
-        stat.node_type_str = get_node_type_string(task.node->type());
-        stat.target_str = get_target_string(task.node->assigned_target());
-        const std::chrono::time_point<std::chrono::high_resolution_clock> task_start = std::chrono::high_resolution_clock::now();
-        stat.start_micros = std::chrono::duration<double, std::micro>(task_start - workload_start).count();
-
         // Blocking map input and output tensors if needed
-        if((execution_type == ExecutionType::EXECUTION_TYPE_PARALLEL
-            || execution_type == ExecutionType::EXECUTION_TYPE_SERIAL_HYBRID)
+        const std::chrono::time_point<std::chrono::high_resolution_clock> task_start = std::chrono::high_resolution_clock::now();
+        if((execution_type == ExecutionType::EXECUTION_TYPE_SERIAL_HYBRID)
             && task.node->assigned_target() == Target::NEON){
             map_node(task.node);
         }
@@ -327,14 +320,21 @@ void call_all_tasks(ExecutionWorkload &workload)
             arm_compute::CLScheduler::get().wait();
         }
         // TODO(Chunwei Xia) Does not unmap the edge if not needed
-        if((execution_type == ExecutionType::EXECUTION_TYPE_PARALLEL
-            || execution_type == ExecutionType::EXECUTION_TYPE_SERIAL_HYBRID)
+        if((execution_type == ExecutionType::EXECUTION_TYPE_SERIAL_HYBRID)
             && task.node->assigned_target() == Target::NEON){
             unmap_node(task.node);
         }
     
         const std::chrono::time_point<std::chrono::high_resolution_clock> task_end = std::chrono::high_resolution_clock::now();
-        stat.end_micros = std::chrono::duration<double, std::micro>(task_end - workload_start).count();
+
+        CallStat stat{
+            task.node->name(),
+            get_node_type_string(task.node->type()),
+            get_target_string(task.node->assigned_target()),
+            {},
+            static_cast<uint64_t>(std::chrono::duration<double, std::micro>(task_start - workload_start).count()),
+            static_cast<uint64_t>(std::chrono::duration<double, std::micro>(task_end - workload_start).count())
+        };
         run_profile.push_back(stat);
     }
     workload.profiles.push_back(run_profile);
@@ -356,11 +356,19 @@ bool ready_to_execute(ExecutionTask &task){
     }
     for(auto edge_idx: node_ptr->input_edges()){
         auto edge = node_ptr->graph()->edge(edge_idx);
-        ARM_COMPUTE_ERROR_ON("Edge's node ptr is null\n");
-        if(edge->producer() == nullptr){
-            return false;
+        if(edge == nullptr){
+            ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("Node %s edge %d is null\n", node_ptr->name().c_str(), edge_idx);
+            continue;
         }
-        if(edge->producer()->type() != NodeType::Const && !(edge->producer()->executed())){
+        if(edge->producer() == nullptr){
+            continue;
+        }
+        if(edge->producer()->type() == NodeType::Const || edge->producer()->type() == NodeType::Input){
+            continue;
+        }
+        if(!(edge->producer()->executed())){
+            ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("%s precedent %s is not ready\n", 
+                node_ptr->name().c_str(), edge->producer()->name().c_str());
             return false;
         }
     }
@@ -402,13 +410,16 @@ void run(std::vector<ExecutionTask*>& device_tasks,
                    continue;
                 }
                 count++;
-                if(count > 100){
+                if(count > 10){
                     break;
                 }
                 if(ready_to_execute(*task)){
+                    ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("%s in %s is ready\n", task->node->name().c_str(), forward_str.c_str());
                     find_ready_task = true;
                     current_task = task;
                     break;
+                }else{
+                    ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("%s in %s is not ready\n", task->node->name().c_str(), forward_str.c_str());
                 }
             }
             if(find_ready_task){
@@ -428,11 +439,13 @@ void run(std::vector<ExecutionTask*>& device_tasks,
         if(current_task == nullptr){
             continue;
         }
+        ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("Start %s on %s\n", current_task->node->name().c_str(), forward_str.c_str());
         auto task_start = std::chrono::high_resolution_clock::now();
         // Blocking map input and output tensors if needed
         if(target == Target::NEON){
             map_node(current_task->node);
         }
+
         (*current_task)();
         if(target != Target::NEON){
             bool is_successor_on_cpu = false;
@@ -450,7 +463,17 @@ void run(std::vector<ExecutionTask*>& device_tasks,
         if(target == Target::NEON){
             unmap_node(current_task->node);
         }
+        // Notify other thread
+        pthread_cond_signal(fast_cond);
         auto task_end = std::chrono::high_resolution_clock::now();
+        // node_attr = '\"{}: {}\" [shape=box,style=filled,color={}];\n'.format(index, short_op_name, "red")
+        if(forward_str=="CPU"){
+            printf(" \"%s\" [shape=box,style=filled,color=red]", current_task->node->name().c_str());
+        }else{
+           printf(" \"%s\" [shape=box,style=filled,color=green]", current_task->node->name().c_str());
+        }
+        
+        ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("End %s on %s\n", current_task->node->name().c_str(), forward_str.c_str());
         CallStat stat{
             current_task->node->name(),
             get_node_type_string(current_task->node->type()),
