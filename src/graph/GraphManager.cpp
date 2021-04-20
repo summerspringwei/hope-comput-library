@@ -168,6 +168,9 @@ void GraphManager::execute_graph(Graph &graph, int loop_count)
     ARM_COMPUTE_ERROR_ON_MSG(it == std::end(_workloads), "Graph is not registered!");
     std::once_flag flag;
     std::call_once(flag, detail::dump_graph_info, it->second);
+    if(loop_count <= 0){
+        return;
+    }
     while(true)
     {
         // Call input accessors
@@ -175,26 +178,50 @@ void GraphManager::execute_graph(Graph &graph, int loop_count)
         {
             return;
         }
+        auto execution_type = it->second.ctx->config().execution_type;
+        printf("Start warm up\n");
+        if(execution_type == ExecutionType::EXECUTION_TYPE_DEFAULT
+            || execution_type == ExecutionType::EXECUTION_TYPE_SERIAL_HYBRID){
+            detail::call_all_tasks(it->second);
+        }else if(execution_type == ExecutionType::EXECUTION_TYPE_PARALLEL){
+            detail::call_all_tasks_parallel(it->second);
+        }
+        printf("End warm up\n");
         // const std::chrono::time_point<std::chrono::high_resolution_clock> start = std::chrono::high_resolution_clock::now();
+        std::chrono::time_point<std::chrono::steady_clock> clock_array[loop_count+1];
+        
         auto start = std::chrono::steady_clock::now();
+        clock_array[0] = start;
         // Run graph loop_count times
         // Run graph
-        auto execution_type = it->second.ctx->config().execution_type;
         if(execution_type == ExecutionType::EXECUTION_TYPE_DEFAULT
             || execution_type == ExecutionType::EXECUTION_TYPE_SERIAL_HYBRID){
             for(int i=0; i<loop_count; ++i){
                 detail::call_all_tasks(it->second);
+                clock_array[i+1] = std::chrono::steady_clock::now();
             }
         }else if(execution_type == ExecutionType::EXECUTION_TYPE_PARALLEL){
             for(int i=0; i<loop_count; ++i){
                 detail::call_all_tasks_parallel(it->second);
+                clock_array[i+1] = std::chrono::steady_clock::now();
             }
         }
         auto end = std::chrono::steady_clock::now();
         // const std::chrono::time_point<std::chrono::high_resolution_clock> end = std::chrono::high_resolution_clock::now();
         // auto total_latency = std::chrono::duration<double, std::micro>(end - start).count();
+        double latency_array[loop_count];
+        double max_latency = 0, min_latency = 1e9;
+        for(int i=0; i<loop_count; ++i){
+            latency_array[i] = std::chrono::duration<double, std::micro>(clock_array[i+1]-clock_array[i]).count();
+            if(latency_array[i] > max_latency){
+                max_latency = latency_array[i];
+            }if(latency_array[i] < min_latency){
+                min_latency = latency_array[i];
+            }
+        }
         auto total_latency = std::chrono::duration<double, std::micro>(end-start).count();
-        printf("Arm Compute library run %s %d times avg %f miliseconds", graph.name().c_str(), loop_count, total_latency / loop_count);
+        printf("Arm Compute library run %s %d times avg %f us, min %f us, max %f us", 
+            graph.name().c_str(), loop_count, total_latency / loop_count, min_latency, max_latency);
         // Write profile info 
         detail::dump_workload_profile(it->second);
         

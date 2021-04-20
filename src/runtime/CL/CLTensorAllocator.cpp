@@ -44,8 +44,16 @@ namespace
  */
 std::unique_ptr<ICLMemoryRegion> allocate_region(CLCoreRuntimeContext *ctx, size_t size, cl_uint alignment)
 {
+    std::unique_ptr<ICLMemoryRegion> region;
+    // region = std::make_unique<CLHostMemoryRegion>(ctx,
+    //                                                                                CL_MEM_READ_WRITE,
+    //                                                                                size
+    // );
+    // if(region != nullptr && region->ptr() != nullptr) {
+    //     return region;
+    // }
     // Try fine-grain SVM
-    std::unique_ptr<ICLMemoryRegion> region = std::make_unique<CLFineSVMMemoryRegion>(ctx,
+    region = std::make_unique<CLFineSVMMemoryRegion>(ctx,
                                                                                       CL_MEM_READ_WRITE | CL_MEM_SVM_FINE_GRAIN_BUFFER,
                                                                                       size,
                                                                                       alignment);

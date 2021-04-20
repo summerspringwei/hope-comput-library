@@ -85,13 +85,40 @@ public:
     void                          *buffer() override;
     const void                    *buffer() const override;
     std::unique_ptr<IMemoryRegion> extract_subregion(size_t offset, size_t size) override;
+    bool mapped;
 
 protected:
     cl::CommandQueue _queue;
     cl::Context      _ctx;
     void            *_mapping;
     cl::Buffer       _mem;
+
 };
+
+/** OpenCL buffer memory region implementation by using memory allocated in host memory space */
+class CLHostMemoryRegion final : public ICLMemoryRegion
+{
+public:
+    /** Constructor
+     *
+     * @param[in] ctx   Runtime context
+     * @param[in] flags Memory flags
+     * @param[in] size  Region size
+     */
+    CLHostMemoryRegion(CLCoreRuntimeContext *ctx, cl_mem_flags flags, size_t size);
+    /** Constructor
+     *
+     * @param[in] buffer Buffer to be used as a memory region
+     * @param[in] ctx    Runtime context
+     */
+    CLHostMemoryRegion(const cl::Buffer &buffer, CLCoreRuntimeContext *ctx);
+
+    // Inherited methods overridden :
+    void *ptr() final;
+    void *map(cl::CommandQueue &q, bool blocking) final;
+    void unmap(cl::CommandQueue &q) final;
+};
+
 
 /** OpenCL buffer memory region implementation */
 class CLBufferMemoryRegion final : public ICLMemoryRegion

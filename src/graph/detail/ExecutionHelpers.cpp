@@ -242,7 +242,8 @@ void prepare_all_tasks(ExecutionWorkload &workload)
 /**Map all the input and output tensors
  * @param[in] node: The node to map tensors
 */
-void map_node(INode *node){
+int map_node(INode *node){
+    int count = 0;
     for(auto edge_idx: node->input_edges()){
         auto edge = node->graph()->edge(edge_idx);
         if(edge == nullptr || edge->tensor()==nullptr){
@@ -250,7 +251,8 @@ void map_node(INode *node){
         }
         if(edge->tensor()->desc().target != node->assigned_target()){
             edge->tensor()->handle()->map(true);
-            printf("map in %p\n", (void*)(edge->tensor()->handle()->tensor().buffer()));
+            count++;
+            ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("map in %p\n", (void*)(edge->tensor()->handle()->tensor().buffer()));
         }
     }
     for(auto edge_idx: node->output_edges()){
@@ -260,20 +262,24 @@ void map_node(INode *node){
         }
         if(edge->tensor()->desc().target != node->assigned_target()){
             edge->tensor()->handle()->map(true);
-            printf("map out %p\n", (void*)(edge->tensor()->handle()->tensor().buffer()));
+            count++;
+            ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("map out %p\n", (void*)(edge->tensor()->handle()->tensor().buffer()));
         }
     }
+    return count;
 }
 
-void unmap_node(INode *node){
+int unmap_node(INode *node){
+    int count = 0;
     for(auto edge_idx: node->input_edges()){
         auto edge = node->graph()->edge(edge_idx);
         if(edge == nullptr || edge->tensor()==nullptr){
             continue;
         }
         if(edge->tensor()->desc().target != node->assigned_target()){
-            printf("unmap in %p\n", (void*)(edge->tensor()->handle()->tensor().buffer()));
+            ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("unmap in %p\n", (void*)(edge->tensor()->handle()->tensor().buffer()));
             edge->tensor()->handle()->unmap();
+            count++;
         }
     }
     for(auto edge_idx: node->output_edges()){
@@ -282,10 +288,12 @@ void unmap_node(INode *node){
             continue;
         }
         if(edge->tensor()->desc().target != node->assigned_target()){
-            printf("unmap in %p\n", (void*)(edge->tensor()->handle()->tensor().buffer()));
+            ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("unmap in %p\n", (void*)(edge->tensor()->handle()->tensor().buffer()));
             edge->tensor()->handle()->unmap();
+            count++;
         }
     }
+    return count;
 }
 
 
@@ -312,9 +320,9 @@ void call_all_tasks(ExecutionWorkload &workload)
             && task.node->assigned_target() == Target::NEON){
             map_node(task.node);
         }
-        printf("Start %s\n", task.node->name().c_str());
+        ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("Start %s\n", task.node->name().c_str());
         task();
-        printf("End %s\n", task.node->name().c_str());
+        ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("End %s\n", task.node->name().c_str());
         if(task.node->assigned_target()==Target::CL){
             // arm_compute::CLScheduler::get().sync();
             arm_compute::CLScheduler::get().wait();
@@ -384,6 +392,7 @@ void run(std::vector<ExecutionTask*>& device_tasks,
     if(device_tasks.size() == 0){
         return;
     }
+    
     const int num_of_tasks = device_tasks.size();
     auto target = device_tasks[0]->node->assigned_target();
     std::string forward_str;
@@ -395,10 +404,13 @@ void run(std::vector<ExecutionTask*>& device_tasks,
     // printf("Start execute on %s units size %d coreId %d\n",
     //         forward_str.c_str(), num_of_tasks, sched_getcpu());
     // printf("OPM_NUM_THREADS: %d\n", omp_get_num_threads());
+    printf("Forward %s on cpu cores:", forward_str.c_str());
     for(auto core_id: cpu_core_list){
         printf(" %d", core_id);
     }printf("\n");
     int executed_task_count = num_of_tasks;
+    double map_overhead = 0;
+    int map_count = 0;
     while(executed_task_count--){
         ExecutionTask *current_task = nullptr;
         while(true){
@@ -443,11 +455,17 @@ void run(std::vector<ExecutionTask*>& device_tasks,
         auto task_start = std::chrono::high_resolution_clock::now();
         // Blocking map input and output tensors if needed
         if(target == Target::NEON){
-            map_node(current_task->node);
+            auto map_start = std::chrono::high_resolution_clock::now();
+            map_count += map_node(current_task->node);
+            auto map_end = std::chrono::high_resolution_clock::now();
+            map_overhead += std::chrono::duration<double, std::micro>(map_end - map_start).count();
         }
 
         (*current_task)();
-        if(target != Target::NEON){
+        if(target == Target::NEON){
+            (*current_task).node->set_executed(true);
+        }
+        else{
             bool is_successor_on_cpu = false;
             for(auto edge_idx: current_task->node->output_edges()){
                 auto edge = current_task->node->graph()->edge(edge_idx);
@@ -459,19 +477,23 @@ void run(std::vector<ExecutionTask*>& device_tasks,
             if(is_successor_on_cpu){
                 arm_compute::CLScheduler::get().wait();
             }
+            (*current_task).node->set_executed(true);
         }
         if(target == Target::NEON){
-            unmap_node(current_task->node);
+            auto map_start = std::chrono::high_resolution_clock::now();
+            // map_count += unmap_node(current_task->node);
+            auto map_end = std::chrono::high_resolution_clock::now();
+            map_overhead += std::chrono::duration<double, std::micro>(map_end - map_start).count();
         }
         // Notify other thread
         pthread_cond_signal(fast_cond);
         auto task_end = std::chrono::high_resolution_clock::now();
         // node_attr = '\"{}: {}\" [shape=box,style=filled,color={}];\n'.format(index, short_op_name, "red")
-        if(forward_str=="CPU"){
-            printf(" \"%s\" [shape=box,style=filled,color=red]", current_task->node->name().c_str());
-        }else{
-           printf(" \"%s\" [shape=box,style=filled,color=green]", current_task->node->name().c_str());
-        }
+        // if(forward_str=="CPU"){
+        //     printf(" \"%s\" [shape=box,style=filled,color=red]", current_task->node->name().c_str());
+        // }else{
+        //    printf(" \"%s\" [shape=box,style=filled,color=green]", current_task->node->name().c_str());
+        // }
         
         ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("End %s on %s\n", current_task->node->name().c_str(), forward_str.c_str());
         CallStat stat{
@@ -486,6 +508,7 @@ void run(std::vector<ExecutionTask*>& device_tasks,
         run_profile.push_back(stat);
         pthread_mutex_unlock(fast_mutex);
     }
+    printf("Map cound %d overhead: %f\n", map_count, map_overhead);
 }
 
 void call_all_tasks_parallel(ExecutionWorkload &workload)
@@ -577,6 +600,7 @@ std::shared_ptr<std::map<std::string, Target>> read_device_map(const char * file
     std::string node;
     int64_t device;
     std::shared_ptr<std::map<std::string, Target>> device_map_ptr(new std::map<std::string, Target>());
+    ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("Get operation device map:%d\n", 10);
     while (infile >> node >> device) {
         Target target;
         if(device==0){
@@ -587,7 +611,7 @@ std::shared_ptr<std::map<std::string, Target>> read_device_map(const char * file
             target = Target::NEON;
         }
         device_map_ptr->insert(std::pair<std::string, Target>(node, target));
-        printf("%s %ld\n", node.c_str(), device);
+        ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("%s %ld\n", node.c_str(), device);
     }
     return device_map_ptr;
 }

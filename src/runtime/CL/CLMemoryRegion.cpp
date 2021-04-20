@@ -36,6 +36,7 @@ ICLMemoryRegion::ICLMemoryRegion(CLCoreRuntimeContext *ctx, size_t size)
       _mapping(nullptr),
       _mem()
 {
+    mapped = false;
 }
 
 const cl::Buffer &ICLMemoryRegion::cl_data() const
@@ -81,8 +82,12 @@ void *CLBufferMemoryRegion::ptr()
 
 void *CLBufferMemoryRegion::map(cl::CommandQueue &q, bool blocking)
 {
+    if(mapped){
+        return _mapping;
+    }
     ARM_COMPUTE_ERROR_ON(_mem.get() == nullptr);
     _mapping = q.enqueueMapBuffer(_mem, blocking ? CL_TRUE : CL_FALSE, CL_MAP_READ | CL_MAP_WRITE, 0, _size);
+    mapped = true;
     return _mapping;
 }
 
@@ -90,6 +95,40 @@ void CLBufferMemoryRegion::unmap(cl::CommandQueue &q)
 {
     ARM_COMPUTE_ERROR_ON(_mem.get() == nullptr);
     q.enqueueUnmapMemObject(_mem, _mapping);
+    _mapping = nullptr;
+    mapped = false;
+}
+
+CLHostMemoryRegion::CLHostMemoryRegion(CLCoreRuntimeContext *ctx, cl_mem_flags flags, size_t size)
+ : ICLMemoryRegion(ctx, size){
+    if(_size != 0)
+    {
+        // CL_MEM_ALLOC_HOST_PTR is recommond way in arm's OpenCL programming guide
+        _mem = cl::Buffer((ctx != nullptr) ? ctx->context() : CLScheduler::get().context(), flags | CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, _size, nullptr);
+    }
+}
+
+
+CLHostMemoryRegion::CLHostMemoryRegion(const cl::Buffer &buffer, CLCoreRuntimeContext *ctx)
+    : ICLMemoryRegion(ctx, buffer.getInfo<CL_MEM_SIZE>())
+{
+    _mem = buffer;
+}
+
+void *CLHostMemoryRegion::ptr(){
+    return nullptr;
+}
+
+void *CLHostMemoryRegion::map(cl::CommandQueue &q, bool blocking)
+{
+    ARM_COMPUTE_ERROR_ON(_mem.get() == nullptr);
+    cl_int err_code;
+    _mapping = clEnqueueMapBuffer(q.get(), _mem.get(), blocking? CL_TRUE: CL_FALSE, CL_MAP_READ|CL_MAP_WRITE, _size, 0,  0, nullptr, nullptr, &err_code);
+    return _mapping;
+}
+
+void CLHostMemoryRegion::unmap(cl::CommandQueue &q){
+    clEnqueueUnmapMemObject(q.get(), _mem.get(), _mapping, 0, nullptr, nullptr);
     _mapping = nullptr;
 }
 

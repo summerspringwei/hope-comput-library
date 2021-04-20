@@ -159,9 +159,6 @@ void configure_graph_tensors_heterogenous(Graph &g){
             }
         }
     }
-    for(auto& tensor_ptr: tensors){
-        printf("tensor %d\n", tensor_ptr->desc().target);
-    }
 }
 
 

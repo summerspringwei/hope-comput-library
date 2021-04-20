@@ -41,7 +41,7 @@ class GraphAlexnetUlayerExample : public Example
 {
 public:
     GraphAlexnetUlayerExample()
-        : cmd_parser(), common_opts(cmd_parser), common_params(), graph(0, "AlexNet")
+        : cmd_parser(), common_opts(cmd_parser), common_params(), graph(0, "AlexNetULayer")
     {
     }
     bool do_setup(int argc, char **argv) override
@@ -80,7 +80,7 @@ public:
 
         // Set weights trained layout
         const DataLayout weights_layout = DataLayout::NCHW;
-
+        float ratio = 0.25;
         graph << common_params.target
               << common_params.fast_math_hint
               << InputLayer(input_descriptor, get_input_accessor(common_params, std::move(preprocessor)))
@@ -88,43 +88,39 @@ public:
               << UConvolutionLayer(graph, 11U, 11U, 96U,
                   get_weights_accessor(data_path, "/cnn_data/alexnet_model/conv1_w.npy", weights_layout),
                   get_weights_accessor(data_path, "/cnn_data/alexnet_model/conv1_b.npy"),
-                  PadStrideInfo(4, 4, 0, 0), 1, 0.25, "conv1")
+                  PadStrideInfo(4, 4, 0, 0), 1, ratio, "conv1")
               << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("relu1")
               << NormalizationLayer(NormalizationLayerInfo(NormType::CROSS_MAP, 5, 0.0001f, 0.75f)).set_name("norm1")
               << PoolingLayer(PoolingLayerInfo(PoolingType::MAX, 3, operation_layout, PadStrideInfo(2, 2, 0, 0))).set_name("pool1")
               // Layer 2
-              << ConvolutionLayer(
-                  5U, 5U, 256U,
+              << UConvolutionLayer(
+                  graph, 5U, 5U, 256U,
                   get_weights_accessor(data_path, "/cnn_data/alexnet_model/conv2_w.npy", weights_layout),
                   get_weights_accessor(data_path, "/cnn_data/alexnet_model/conv2_b.npy"),
-                  PadStrideInfo(1, 1, 2, 2), 1)
-              .set_name("conv2")
+                  PadStrideInfo(1, 1, 2, 2), 1, ratio, "conv2")
               << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("relu2")
               << NormalizationLayer(NormalizationLayerInfo(NormType::CROSS_MAP, 5, 0.0001f, 0.75f)).set_name("norm2")
               << PoolingLayer(PoolingLayerInfo(PoolingType::MAX, 3, operation_layout, PadStrideInfo(2, 2, 0, 0))).set_name("pool2")
               // Layer 3
-              << ConvolutionLayer(
-                  3U, 3U, 384U,
+              << UConvolutionLayer(
+                  graph, 3U, 3U, 384U,
                   get_weights_accessor(data_path, "/cnn_data/alexnet_model/conv3_w.npy", weights_layout),
                   get_weights_accessor(data_path, "/cnn_data/alexnet_model/conv3_b.npy"),
-                  PadStrideInfo(1, 1, 1, 1))
-              .set_name("conv3")
+                  PadStrideInfo(1, 1, 1, 1), 1, ratio, "conv3")
               << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("relu3")
               // Layer 4
-              << ConvolutionLayer(
-                  3U, 3U, 384U,
+              << UConvolutionLayer(
+                  graph, 3U, 3U, 384U,
                   get_weights_accessor(data_path, "/cnn_data/alexnet_model/conv4_w.npy", weights_layout),
                   get_weights_accessor(data_path, "/cnn_data/alexnet_model/conv4_b.npy"),
-                  PadStrideInfo(1, 1, 1, 1), 1)
-              .set_name("conv4")
+                  PadStrideInfo(1, 1, 1, 1), 1, ratio, "conv4")
               << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("relu4")
               // Layer 5
-              << ConvolutionLayer(
-                  3U, 3U, 256U,
+              << UConvolutionLayer(
+                  graph, 3U, 3U, 256U,
                   get_weights_accessor(data_path, "/cnn_data/alexnet_model/conv5_w.npy", weights_layout),
                   get_weights_accessor(data_path, "/cnn_data/alexnet_model/conv5_b.npy"),
-                  PadStrideInfo(1, 1, 1, 1), 1)
-              .set_name("conv5")
+                  PadStrideInfo(1, 1, 1, 1), 1, ratio, "conv5")
               << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("relu5")
               << PoolingLayer(PoolingLayerInfo(PoolingType::MAX, 3, operation_layout, PadStrideInfo(2, 2, 0, 0))).set_name("pool5")
               // Layer 6
