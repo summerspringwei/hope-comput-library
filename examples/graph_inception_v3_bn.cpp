@@ -203,6 +203,8 @@ public:
         config.tuner_file       = common_params.tuner_file;
         config.mlgo_file        = common_params.mlgo_file;
         config.convert_to_uint8 = (common_params.data_type == DataType::QASYMM8);
+        config.execution_type   = common_params.execution_type;
+        config.device_map_file  = common_params.device_map_file;
 
         graph.finalize(common_params.target, config);
 

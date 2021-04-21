@@ -29,6 +29,7 @@
 #include "utils/CommonGraphOptions.h"
 #include "utils/GraphUtils.h"
 #include "utils/Utils.h"
+#include "arm_compute/graph/ULayer.h"
 
 using namespace arm_compute;
 using namespace arm_compute::utils;
@@ -40,7 +41,7 @@ class InceptionV4Example final : public Example
 {
 public:
     InceptionV4Example()
-        : cmd_parser(), common_opts(cmd_parser), common_params(), graph(0, "InceptionV4")
+        : cmd_parser(), common_opts(cmd_parser), common_params(), graph(0, "InceptionV4Ulayer")
     {
     }
     bool do_setup(int argc, char **argv) override
@@ -80,22 +81,19 @@ public:
               << common_params.fast_math_hint
               << InputLayer(input_descriptor, get_input_accessor(common_params, std::move(preprocessor), false))
               // Conv2d_1a_3x3
-              << ConvolutionLayer(3U, 3U, 32U,
+              << UConvolutionLayer(graph, 3U, 3U, 32U,
                                   get_weights_accessor(data_path, "/cnn_data/inceptionv4_model/Conv2d_1a_3x3_weights.npy", weights_layout),
-                                  std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(2, 2, 0, 0))
-              .set_name("Conv2d_1a_3x3/Conv2D")
+                                  std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(2, 2, 0, 0), 1, ratio, "Conv2d_1a_3x3/Conv2D")
               << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Conv2d_1a_3x3/Relu")
               // Conv2d_2a_3x3
-              << ConvolutionLayer(3U, 3U, 32U,
+              << UConvolutionLayer(graph, 3U, 3U, 32U,
                                   get_weights_accessor(data_path, "/cnn_data/inceptionv4_model/Conv2d_2a_3x3_weights.npy", weights_layout),
-                                  std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
-              .set_name("Conv2d_2a_3x3/Conv2D")
+                                  std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0), 1, ratio, "Conv2d_2a_3x3/Conv2D")
               << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Conv2d_2a_3x3/Relu")
               // Conv2d_2b_3x3
-              << ConvolutionLayer(3U, 3U, 64U,
+              << UConvolutionLayer(graph, 3U, 3U, 64U,
                                   get_weights_accessor(data_path, "/cnn_data/inceptionv4_model/Conv2d_2b_3x3_weights.npy", weights_layout),
-                                  std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 1, 1))
-              .set_name("Conv2d_2b_3x3/Conv2D")
+                                  std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 1, 1), 1, ratio, "Conv2d_2b_3x3/Conv2D")
               << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Conv2d_2b_3x3/Relu");
 
         graph << get_mixed_3a(data_path, weights_layout).set_name("Mixed_3a/concat");
@@ -140,6 +138,8 @@ public:
         config.tuner_file       = common_params.tuner_file;
         config.mlgo_file        = common_params.mlgo_file;
         config.convert_to_uint8 = (common_params.data_type == DataType::QASYMM8);
+        config.execution_type   = common_params.execution_type;
+        config.device_map_file  = common_params.device_map_file;
 
         // Load the precompiled kernels from a file into the kernel library, in this way the next time they are needed
         // compilation won't be required.
@@ -173,6 +173,7 @@ private:
     CommonGraphOptions common_opts;
     CommonGraphParams  common_params;
     Stream             graph;
+    float              ratio;
 
 private:
     ConcatLayer get_mixed_3a(const std::string &data_path, DataLayout weights_layout)
@@ -185,10 +186,9 @@ private:
             .set_name("Mixed_3a/Branch_0/MaxPool_0a_3x3/MaxPool");
 
         SubStream i_b(graph);
-        i_b << ConvolutionLayer(3U, 3U, 96U,
+        i_b << UConvolutionLayer(graph, 3U, 3U, 96U,
                                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0a_3x3_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(2, 2, 0, 0))
-            .set_name("Mixed_3a/Branch_1/Conv2d_0a_3x3/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(2, 2, 0, 0), 1, ratio, "Mixed_3a/Branch_1/Conv2d_0a_3x3/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Mixed_3a/Branch_1/Conv2d_0a_3x3/Relu");
 
         return ConcatLayer(std::move(i_a), std::move(i_b));
@@ -199,37 +199,31 @@ private:
         std::string total_path = "/cnn_data/inceptionv4_model/Mixed_4a_";
 
         SubStream i_a(graph);
-        i_a << ConvolutionLayer(1U, 1U, 64U,
+        i_a << UConvolutionLayer(graph,1U, 1U, 64U,
                                 get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_0a_1x1_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
-            .set_name("Mixed_4a/Branch_0/Conv2d_0a_1x1/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0), 1, ratio, "Mixed_4a/Branch_0/Conv2d_0a_1x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Mixed_4a/Branch_0/Conv2d_0a_1x1/Relu")
-            << ConvolutionLayer(3U, 3U, 96U,
+            << UConvolutionLayer(graph,3U, 3U, 96U,
                                 get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_1a_3x3_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
-            .set_name("Mixed_4a/Branch_0/Conv2d_1a_3x3/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0), 1, ratio, "Mixed_4a/Branch_0/Conv2d_1a_3x3/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Mixed_4a/Branch_0/Conv2d_1a_3x3/Relu");
 
         SubStream i_b(graph);
-        i_b << ConvolutionLayer(1U, 1U, 64U,
+        i_b << UConvolutionLayer(graph,1U, 1U, 64U,
                                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0a_1x1_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
-            .set_name("Mixed_4a/Branch_1/Conv2d_0a_1x1/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0), 1, ratio, "Mixed_4a/Branch_1/Conv2d_0a_1x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Mixed_4a/Branch_1/Conv2d_0a_1x1/Relu")
-            << ConvolutionLayer(7U, 1U, 64U,
+            << UConvolutionLayer(graph,7U, 1U, 64U,
                                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0b_1x7_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 3, 0))
-            .set_name("Mixed_4a/Branch_1/Conv2d_0b_1x7/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 3, 0), 1, ratio, "Mixed_4a/Branch_1/Conv2d_0b_1x7/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Mixed_4a/Branch_1/Conv2d_0b_1x7/Relu")
-            << ConvolutionLayer(1U, 7U, 64U,
+            << UConvolutionLayer(graph,1U, 7U, 64U,
                                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0c_7x1_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 3))
-            .set_name("Mixed_4a/Branch_1/Conv2d_0c_7x1/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 3), 1, ratio, "Mixed_4a/Branch_1/Conv2d_0c_7x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Mixed_4a/Branch_1/Conv2d_0c_7x1/Relu")
-            << ConvolutionLayer(3U, 3U, 96U,
+            << UConvolutionLayer(graph,3U, 3U, 96U,
                                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_1a_3x3_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
-            .set_name("Mixed_4a/Branch_1/Conv2d_1a_3x3/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0), 1, ratio, "Mixed_4a/Branch_1/Conv2d_1a_3x3/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Mixed_4a/Branch_1/Conv2d_1a_3x3/Relu");
 
         return ConcatLayer(std::move(i_a), std::move(i_b));
@@ -240,10 +234,9 @@ private:
         std::string total_path = "/cnn_data/inceptionv4_model/Mixed_5a_";
 
         SubStream i_a(graph);
-        i_a << ConvolutionLayer(3U, 3U, 192U,
+        i_a << UConvolutionLayer(graph,3U, 3U, 192U,
                                 get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_1a_3x3_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(2, 2, 0, 0))
-            .set_name("Mixed_5a/Branch_0/Conv2d_1a_3x3/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(2, 2, 0, 0), 1, ratio, "Mixed_5a/Branch_0/Conv2d_1a_3x3/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Mixed_5a/Branch_0/Conv2d_1a_3x3/Relu");
 
         SubStream i_b(graph);
@@ -259,49 +252,42 @@ private:
         std::string total_path = "/cnn_data/inceptionv4_model/" + param_path + "_";
 
         SubStream i_a(graph);
-        i_a << ConvolutionLayer(1U, 1U, 96U,
+        i_a << UConvolutionLayer(graph,1U, 1U, 96U,
                                 get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_0a_1x1_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
-            .set_name(param_path + "/Branch_0/Conv2d_0a_1x1/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0), 1, ratio, param_path + "/Branch_0/Conv2d_0a_1x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_0/Conv2d_0a_1x1/Relu");
 
         SubStream i_b(graph);
-        i_b << ConvolutionLayer(1U, 1U, 64U,
+        i_b << UConvolutionLayer(graph,1U, 1U, 64U,
                                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0a_1x1_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
-            .set_name(param_path + "/Branch_1/Conv2d_0a_1x1/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0), 1, ratio, param_path + "/Branch_0/Conv2d_0a_1x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d_0a_1x1/Relu")
-            << ConvolutionLayer(3U, 3U, 96U,
+            << UConvolutionLayer(graph,3U, 3U, 96U,
                                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0b_3x3_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 1, 1))
-            .set_name(param_path + "/Branch_1/Conv2d_0b_3x3/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 1, 1), 1, ratio, param_path + "/Branch_1/Conv2d_0b_3x3/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d_0b_3x3/Relu");
 
         SubStream i_c(graph);
-        i_c << ConvolutionLayer(1U, 1U, 64U,
+        i_c << UConvolutionLayer(graph,1U, 1U, 64U,
                                 get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0a_1x1_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
-            .set_name(param_path + "/Branch_2/Conv2d_0a_1x1/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0), 1, ratio, param_path + "/Branch_2/Conv2d_0a_1x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0a_1x1/Relu")
-            << ConvolutionLayer(3U, 3U, 96U,
+            << UConvolutionLayer(graph,3U, 3U, 96U,
                                 get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0b_3x3_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 1, 1))
-            .set_name(param_path + "/Branch_2/Conv2d_0b_3x3/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 1, 1), 1, ratio, param_path + "/Branch_2/Conv2d_0b_3x3/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0b_3x3/Relu")
-            << ConvolutionLayer(3U, 3U, 96U,
+            << UConvolutionLayer(graph,3U, 3U, 96U,
                                 get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0c_3x3_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 1, 1))
-            .set_name(param_path + "/Branch_2/Conv2d_0c_3x3/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 1, 1), 1, ratio, param_path + "/Branch_2/Conv2d_0c_3x3/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0c_3x3/Relu");
 
         SubStream i_d(graph);
         i_d << PoolingLayer(PoolingLayerInfo(PoolingType::AVG, 3, common_params.data_layout, PadStrideInfo(1, 1, 1, 1, DimensionRoundingType::CEIL),
                                              true))
             .set_name(param_path + "/Branch_3/AvgPool_0a_3x3/AvgPool")
-            << ConvolutionLayer(1U, 1U, 96U,
+            << UConvolutionLayer(graph,1U, 1U, 96U,
                                 get_weights_accessor(data_path, total_path + "Branch_3_Conv2d_0b_1x1_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
-            .set_name(param_path + "/Branch_3/Conv2d_0b_1x1/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0), 1, ratio, param_path + "/Branch_3/Conv2d_0b_1x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_3/Conv2d_0b_1x1/Relu");
 
         return ConcatLayer(std::move(i_a), std::move(i_b), std::move(i_c), std::move(i_d));
@@ -312,27 +298,23 @@ private:
         std::string total_path = "/cnn_data/inceptionv4_model/Mixed_6a_";
 
         SubStream i_a(graph);
-        i_a << ConvolutionLayer(3U, 3U, 384U,
+        i_a << UConvolutionLayer(graph,3U, 3U, 384U,
                                 get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_1a_3x3_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(2, 2, 0, 0))
-            .set_name("Mixed_6a/Branch_0/Conv2d_1a_3x3/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(2, 2, 0, 0), 1, ratio, "Mixed_6a/Branch_0/Conv2d_1a_3x3/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Mixed_6a/Branch_0/Conv2d_1a_3x3/Relu");
 
         SubStream i_b(graph);
-        i_b << ConvolutionLayer(1U, 1U, 192U,
+        i_b << UConvolutionLayer(graph,1U, 1U, 192U,
                                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0a_1x1_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
-            .set_name("Mixed_6a/Branch_1/Conv2d_0a_1x1/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0), 1, ratio, "Mixed_6a/Branch_1/Conv2d_0a_1x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Mixed_6a/Branch_1/Conv2d_0a_1x1/Relu")
-            << ConvolutionLayer(3U, 3U, 224U,
+            << UConvolutionLayer(graph,3U, 3U, 224U,
                                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0b_3x3_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 1, 1))
-            .set_name("Mixed_6a/Branch_1/Conv2d_0b_3x3/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 1, 1), 1, ratio, "Mixed_6a/Branch_1/Conv2d_0b_3x3/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Mixed_6a/Branch_1/Conv2d_0b_3x3/Relu")
-            << ConvolutionLayer(3U, 3U, 256U,
+            << UConvolutionLayer(graph,3U, 3U, 256U,
                                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_1a_3x3_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(2, 2, 0, 0))
-            .set_name("Mixed_6a/Branch_1/Conv2d_1a_3x3/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(2, 2, 0, 0), 1, ratio, "Mixed_6a/Branch_1/Conv2d_1a_3x3/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Mixed_6a/Branch_1/Conv2d_1a_3x3/Relu");
 
         SubStream i_c(graph);
@@ -348,64 +330,54 @@ private:
         std::string total_path = "/cnn_data/inceptionv4_model/" + param_path + "_";
 
         SubStream i_a(graph);
-        i_a << ConvolutionLayer(1U, 1U, 384U,
+        i_a << UConvolutionLayer(graph,1U, 1U, 384U,
                                 get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_0a_1x1_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
-            .set_name(param_path + "/Branch_0/Conv2d_0a_1x1/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0), 1, ratio, param_path + "/Branch_0/Conv2d_0a_1x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_0/Conv2d_0a_1x1/Relu");
 
         SubStream i_b(graph);
-        i_b << ConvolutionLayer(1U, 1U, 192U,
+        i_b << UConvolutionLayer(graph,1U, 1U, 192U,
                                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0a_1x1_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
-            .set_name(param_path + "/Branch_1/Conv2d_0a_1x1/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0), 1, ratio, param_path + "/Branch_1/Conv2d_0a_1x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d_0a_1x1/Relu")
-            << ConvolutionLayer(7U, 1U, 224U,
+            << UConvolutionLayer(graph,7U, 1U, 224U,
                                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0b_1x7_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 3, 0))
-            .set_name(param_path + "/Branch_1/Conv2d_0b_1x7/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 3, 0), 1, ratio, param_path + "/Branch_1/Conv2d_0b_1x7/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d_0b_1x7/Relu")
-            << ConvolutionLayer(1U, 7U, 256U,
+            << UConvolutionLayer(graph,1U, 7U, 256U,
                                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0c_7x1_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 3))
-            .set_name(param_path + "/Branch_1/Conv2d_0c_7x1/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 3), 1, ratio, param_path + "/Branch_1/Conv2d_0c_7x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d_0c_7x1/Relu");
 
         SubStream i_c(graph);
-        i_c << ConvolutionLayer(1U, 1U, 192U,
+        i_c << UConvolutionLayer(graph,1U, 1U, 192U,
                                 get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0a_1x1_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
-            .set_name(param_path + "/Branch_2/Conv2d_0a_1x1/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0), 1, ratio, param_path + "/Branch_2/Conv2d_0a_1x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0a_1x1/Relu")
-            << ConvolutionLayer(1U, 7U, 192U,
+            << UConvolutionLayer(graph,1U, 7U, 192U,
                                 get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0b_7x1_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 3))
-            .set_name(param_path + "/Branch_2/Conv2d_0b_7x1/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 3), 1, ratio, param_path + "/Branch_2/Conv2d_0b_7x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0b_7x1/Relu")
-            << ConvolutionLayer(7U, 1U, 224U,
+            << UConvolutionLayer(graph,7U, 1U, 224U,
                                 get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0c_1x7_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 3, 0))
-            .set_name(param_path + "/Branch_2/Conv2d_0c_1x7/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 3, 0), 1, ratio, param_path + "/Branch_2/Conv2d_0c_1x7/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0c_1x7/Relu")
-            << ConvolutionLayer(1U, 7U, 224U,
+            << UConvolutionLayer(graph,1U, 7U, 224U,
                                 get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0d_7x1_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 3))
-            .set_name(param_path + "/Branch_2/Conv2d_0d_7x1/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 3), 1, ratio, param_path + "/Branch_2/Conv2d_0d_7x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0d_7x1/Relu")
-            << ConvolutionLayer(7U, 1U, 256U,
+            << UConvolutionLayer(graph,7U, 1U, 256U,
                                 get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0e_1x7_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 3, 0))
-            .set_name(param_path + "/Branch_2/Conv2d_0e_1x7/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 3, 0), 1, ratio, param_path + "/Branch_2/Conv2d_0e_1x7/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0e_1x7/Relu");
 
         SubStream i_d(graph);
         i_d << PoolingLayer(PoolingLayerInfo(PoolingType::AVG, 3, common_params.data_layout, PadStrideInfo(1, 1, 1, 1, DimensionRoundingType::CEIL),
                                              true))
             .set_name(param_path + "/Branch_3/AvgPool_0a_3x3/AvgPool")
-            << ConvolutionLayer(1U, 1U, 128U,
+            << UConvolutionLayer(graph,1U, 1U, 128U,
                                 get_weights_accessor(data_path, total_path + "Branch_3_Conv2d_0b_1x1_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
-            .set_name(param_path + "/Branch_3/Conv2d_0b_1x1/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0), 1, ratio, param_path + "/Branch_3/Conv2d_0b_1x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_3/Conv2d_0b_1x1/Relu");
 
         return ConcatLayer(std::move(i_a), std::move(i_b), std::move(i_c), std::move(i_d));
@@ -416,37 +388,34 @@ private:
         std::string total_path = "/cnn_data/inceptionv4_model/Mixed_7a_";
 
         SubStream i_a(graph);
-        i_a << ConvolutionLayer(1U, 1U, 192U,
+        i_a << UConvolutionLayer(graph,1U, 1U, 192U,
                                 get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_0a_1x1_weights.npy", weights_layout),
                                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
             .set_name("Mixed_7a/Branch_1/Conv2d_0a_1x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Mixed_7a/Branch_1/Conv2d_0a_1x1/Relu")
-            << ConvolutionLayer(3U, 3U, 192U,
+            << UConvolutionLayer(graph,3U, 3U, 192U,
                                 get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_1a_3x3_weights.npy", weights_layout),
                                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(2, 2, 0, 0))
             .set_name("Mixed_7a/Branch_0/Conv2d_1a_3x3/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Mixed_7a/Branch_0/Conv2d_1a_3x3/Relu");
 
         SubStream i_b(graph);
-        i_b << ConvolutionLayer(1U, 1U, 256U,
+        i_b << UConvolutionLayer(graph,1U, 1U, 256U,
                                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0a_1x1_weights.npy", weights_layout),
                                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
             .set_name("Mixed_7a/Branch_1/Conv2d_0a_1x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Mixed_7a/Branch_1/Conv2d_0a_1x1/Relu")
-            << ConvolutionLayer(7U, 1U, 256U,
+            << UConvolutionLayer(graph,7U, 1U, 256U,
                                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0b_1x7_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 3, 0))
-            .set_name("Mixed_7a/Branch_1/Conv2d_0b_1x7/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 3, 0), 1, ratio, "Mixed_7a/Branch_1/Conv2d_0b_1x7/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Mixed_7a/Branch_1/Conv2d_0b_1x7/Relu")
-            << ConvolutionLayer(1U, 7U, 320U,
+            << UConvolutionLayer(graph,1U, 7U, 320U,
                                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0c_7x1_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 3))
-            .set_name("Mixed_7a/Branch_1/Conv2d_0c_7x1/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 3), 1, ratio, "Mixed_7a/Branch_1/Conv2d_0c_7x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Mixed_7a/Branch_1/Conv2d_0c_7x1/Relu")
-            << ConvolutionLayer(3U, 3U, 320U,
+            << UConvolutionLayer(graph,3U, 3U, 320U,
                                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_1a_3x3_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(2, 2, 0, 0))
-            .set_name("Mixed_7a/Branch_1/Conv2d_1a_3x3/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(2, 2, 0, 0), 1, ratio, "Mixed_7a/Branch_1/Conv2d_1a_3x3/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name("Mixed_7a/Branch_1/Conv2d_1a_3x3/Relu");
 
         SubStream i_c(graph);
@@ -462,81 +431,72 @@ private:
         std::string total_path = "/cnn_data/inceptionv4_model/" + param_path + "_";
 
         SubStream i_a(graph);
-        i_a << ConvolutionLayer(1U, 1U, 256U,
+        i_a << UConvolutionLayer(graph,1U, 1U, 256U,
                                 get_weights_accessor(data_path, total_path + "Branch_0_Conv2d_0a_1x1_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
-            .set_name(param_path + "/Branch_0/Conv2d_0a_1x1/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0), 1, ratio, param_path + "/Branch_0/Conv2d_0a_1x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_0/Conv2d_0a_1x1/Relu");
 
         SubStream i_b(graph);
-        i_b << ConvolutionLayer(
+        i_b << UConvolutionLayer(graph,
                 1U, 1U, 384U,
                 get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0a_1x1_weights.npy", weights_layout),
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
-                PadStrideInfo(1, 1, 0, 0))
-            .set_name(param_path + "/Branch_1/Conv2d_0a_1x1/Conv2D")
+                PadStrideInfo(1, 1, 0, 0), 1, ratio, param_path + "/Branch_1/Conv2d_0a_1x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d_0a_1x1/Relu");
 
         SubStream i_b1(i_b);
-        i_b1 << ConvolutionLayer(
+        i_b1 << UConvolutionLayer(graph,
                  3U, 1U, 256U,
                  get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0b_1x3_weights.npy", weights_layout),
                  std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
-                 PadStrideInfo(1, 1, 1, 0))
-             .set_name(param_path + "/Branch_1/Conv2d_0b_1x3/Conv2D")
+                 PadStrideInfo(1, 1, 1, 0), 1, ratio, param_path + "/Branch_1/Conv2d_0b_1x3/Conv2D")
              << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d_0b_1x3/Relu");
 
         SubStream i_b2(i_b);
-        i_b2 << ConvolutionLayer(
+        i_b2 << UConvolutionLayer(graph,
                  1U, 3U, 256U,
                  get_weights_accessor(data_path, total_path + "Branch_1_Conv2d_0c_3x1_weights.npy", weights_layout),
                  std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
-                 PadStrideInfo(1, 1, 0, 1))
-             .set_name(param_path + "/Branch_1/Conv2d_0c_3x1/Conv2D")
+                 PadStrideInfo(1, 1, 0, 1), 1, ratio, param_path + "/Branch_1/Conv2d_0c_3x1/Conv2D")
              << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_1/Conv2d_0c_3x1/Relu");
 
         // Merge b1 and b2
         i_b << ConcatLayer(std::move(i_b1), std::move(i_b2)).set_name(param_path + "/Branch_1/concat");
 
         SubStream i_c(graph);
-        i_c << ConvolutionLayer(
+        i_c << UConvolutionLayer(graph,
                 1U, 1U, 384U,
                 get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0a_1x1_weights.npy", weights_layout),
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
-                PadStrideInfo(1, 1, 0, 0))
-            .set_name(param_path + "/Branch_2/Conv2d_0a_1x1/Conv2D")
+                PadStrideInfo(1, 1, 0, 0), 1, ratio, param_path + "/Branch_2/Conv2d_0a_1x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0a_1x1/Relu")
-            << ConvolutionLayer(
+            << UConvolutionLayer(graph,
                 1U, 3U, 448U,
                 get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0b_3x1_weights.npy", weights_layout),
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
-                PadStrideInfo(1, 1, 0, 1))
-            .set_name(param_path + "/Branch_2/Conv2d_0b_3x1/Conv2D")
+                PadStrideInfo(1, 1, 0, 1), 1, ratio, param_path + "/Branch_2/Conv2d_0b_3x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0b_3x1/Relu")
-            << ConvolutionLayer(
+            << UConvolutionLayer(graph,
                 3U, 1U, 512U,
                 get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0c_1x3_weights.npy", weights_layout),
                 std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
-                PadStrideInfo(1, 1, 1, 0))
-            .set_name(param_path + "/Branch_2/Conv2d_0c_1x3/Conv2D")
+                PadStrideInfo(1, 1, 1, 0), 1, ratio, param_path + "/Branch_2/Conv2d_0c_1x3/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0c_1x3/Relu");
 
         SubStream i_c1(i_c);
-        i_c1 << ConvolutionLayer(
+        i_c1 << UConvolutionLayer(graph,
                  3U, 1U, 256U,
                  get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0d_1x3_weights.npy", weights_layout),
                  std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
-                 PadStrideInfo(1, 1, 1, 0))
-             .set_name(param_path + "/Branch_2/Conv2d_0d_1x3/Conv2D")
+                 PadStrideInfo(1, 1, 1, 0), 1, ratio, param_path + "/Branch_2/Conv2d_0d_1x3/Conv2D")
              << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0d_1x3/Relu");
 
         SubStream i_c2(i_c);
-        i_c2 << ConvolutionLayer(
+        i_c2 << UConvolutionLayer(graph,
                  1U, 3U, 256U,
                  get_weights_accessor(data_path, total_path + "Branch_2_Conv2d_0e_3x1_weights.npy", weights_layout),
                  std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr),
-                 PadStrideInfo(1, 1, 0, 1))
-             .set_name(param_path + "/Branch_2/Conv2d_0e_3x1/Conv2D")
+                 PadStrideInfo(1, 1, 0, 1), 1, ratio, param_path + "/Branch_2/Conv2d_0e_3x1/Conv2D")
              << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_2/Conv2d_0e_3x1/Relu");
 
         // Merge i_c1 and i_c2
@@ -546,10 +506,9 @@ private:
         i_d << PoolingLayer(PoolingLayerInfo(PoolingType::AVG, 3, common_params.data_layout, PadStrideInfo(1, 1, 1, 1, DimensionRoundingType::CEIL),
                                              true))
             .set_name(param_path + "/Branch_3/AvgPool_0a_3x3/AvgPool")
-            << ConvolutionLayer(1U, 1U, 256U,
+            << UConvolutionLayer(graph,1U, 1U, 256U,
                                 get_weights_accessor(data_path, total_path + "Branch_3_Conv2d_0b_1x1_weights.npy", weights_layout),
-                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0))
-            .set_name(param_path + "/Branch_3/Conv2d_0b_1x1/Conv2D")
+                                std::unique_ptr<arm_compute::graph::ITensorAccessor>(nullptr), PadStrideInfo(1, 1, 0, 0), 1, ratio, param_path + "/Branch_3/Conv2d_0b_1x1/Conv2D")
             << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU)).set_name(param_path + "/Branch_3/Conv2d_0b_1x1/Relu");
 
         return ConcatLayer(std::move(i_a), std::move(i_b), std::move(i_c), std::move(i_d));

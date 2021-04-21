@@ -452,7 +452,7 @@ void run(std::vector<ExecutionTask*>& device_tasks,
             continue;
         }
         ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("Start %s on %s\n", current_task->node->name().c_str(), forward_str.c_str());
-        auto task_start = std::chrono::high_resolution_clock::now();
+        
         // Blocking map input and output tensors if needed
         if(target == Target::NEON){
             auto map_start = std::chrono::high_resolution_clock::now();
@@ -460,20 +460,33 @@ void run(std::vector<ExecutionTask*>& device_tasks,
             auto map_end = std::chrono::high_resolution_clock::now();
             map_overhead += std::chrono::duration<double, std::micro>(map_end - map_start).count();
         }
-
+        auto task_start = std::chrono::high_resolution_clock::now();
         (*current_task)();
         if(target == Target::NEON){
             (*current_task).node->set_executed(true);
         }
         else{
             bool is_successor_on_cpu = false;
+            // If its successor's precessor is on CPU, then it must start as soon as possible
             for(auto edge_idx: current_task->node->output_edges()){
                 auto edge = current_task->node->graph()->edge(edge_idx);
                 if(edge->consumer()->assigned_target() == Target::NEON){
                     is_successor_on_cpu = true;
                     break;
+                }else{
+                    for(auto edge_in_idx: edge->consumer()->input_edges()){
+                        auto edge_in = current_task->node->graph()->edge(edge_in_idx);
+                        if(edge_in->producer() != nullptr && edge_in->producer()->assigned_target() == Target::NEON){
+                            is_successor_on_cpu = true;
+                            break;  
+                        }
+                    }
+                    if(is_successor_on_cpu){
+                        break;
+                    }
                 }
             }
+            
             if(is_successor_on_cpu){
                 arm_compute::CLScheduler::get().wait();
             }
