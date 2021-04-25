@@ -88,71 +88,11 @@ public:
         // Set weights trained layout
         const DataLayout weights_layout = DataLayout::NCHW;
         ARM_COMPUTE_UNUSED(weights_layout);
-        // Calculate the total number of cells in the network
-        // Add 2 for the reduction cell and add additional 2 for the stem cells
-        int total_num_cells = net_params.num_cells + 2 + 2;
         graph << common_params.target
               << common_params.fast_math_hint
               << InputLayer(input_descriptor, get_input_accessor(common_params, std::move(preprocessor), false));
+        build_nasnet_base(graph, net_params);
         
-        NasNetANormalCell normal_cell(net_params.num_conv_filters, net_params.drop_path_keep_prob,
-            total_num_cells, 1, false);
-        NasNetAReductionCell reduction_cell(net_params.num_conv_filters, net_params.drop_path_keep_prob,
-            total_num_cells, 1, false);
-
-        std::shared_ptr<SubStream> net(new SubStream(graph));
-        // NasNetAReductionCell stem_cell(net_params.num_conv_filters, net_params.drop_path_keep_prob,
-        //     total_num_cells, 1, false);
-        auto net_and_cell_outputs = _imagenet_stem(net, net_params, reduction_cell, "imagenet_stem");
-        
-        auto reduction_indices = calc_reduction_layers(net_params.num_cells, net_params.num_reduction_layers);
-        std::vector<int> aux_head_cell_idxes;
-        if (reduction_indices.size() >= 2){
-            aux_head_cell_idxes.push_back(reduction_indices[1] - 1);
-        }
-        
-        // Run the cells
-        float filter_scaling = 1.0;
-        int true_cell_num = 2;
-        
-        net = (net_and_cell_outputs.net);
-        for(int cell_num=0; cell_num<net_params.num_cells; ++cell_num){
-            int stride = 1;
-            std::shared_ptr<SubStream> prev_layer;
-            if(net_params.skip_reduction_layer_input){
-                prev_layer = net_and_cell_outputs.cell_output[net_and_cell_outputs.cell_output.size()-2];
-            }
-            
-            if(vector_find<int>(reduction_indices, cell_num)){
-                filter_scaling *= net_params.filter_scaling_rate;
-                net = reduction_cell(net, "reduction_cell_"+std::to_string(reduction_indices[cell_num]),
-                    filter_scaling, 2, net_and_cell_outputs.cell_output[net_and_cell_outputs.cell_output.size()-2],
-                    true_cell_num, nullptr);
-                true_cell_num += 1;
-                net_and_cell_outputs.cell_output.push_back(std::shared_ptr<SubStream>(new SubStream(*net)));
-            }
-            
-            if(!net_params.skip_reduction_layer_input){
-                prev_layer = net_and_cell_outputs.cell_output[net_and_cell_outputs.cell_output.size()-2];
-            }
-            net = normal_cell(net, "cell_"+std::to_string(cell_num),
-                filter_scaling, stride, prev_layer, true_cell_num, nullptr);
-            // if add_and_check_endpoint('Cell_{}'.format(cell_num), net):
-            //     return net, end_points
-            true_cell_num += 1;
-            // Omit the operation only needed for training
-            net_and_cell_outputs.cell_output.push_back(std::shared_ptr<SubStream>(new SubStream(*net)));
-        }
-        printf("before final_layer\n");
-        print_tensor_shape(get_tail_shape(net));
-        *net << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU));
-        *net << PoolingLayer(PoolingLayerInfo(PoolingType::AVG, 11, DataLayout::NCHW, PadStrideInfo(1, 1, 0, 0)));
-        *net << FullyConnectedLayer(1001, std::make_unique<DummyAccessor>(), 
-            std::make_unique<DummyAccessor>());
-        printf("before fc\n");
-        print_tensor_shape(get_tail_shape(net));
-        SubStream help_ss(*net);
-        graph << ConcatLayer(std::move(*net), std::move(help_ss));
         graph << OutputLayer(get_output_accessor(common_params, 5));
 
         // Finalize graph

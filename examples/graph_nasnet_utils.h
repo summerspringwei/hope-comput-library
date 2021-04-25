@@ -564,7 +564,7 @@ Net_And_CellOutputs _imagenet_stem(std::shared_ptr<SubStream> graph, HParams hpa
     return Net_And_CellOutputs{graph, cell_outputs};
 }
 
-void build_nasnet_base(SubStream& graph, HParams net_params){
+void build_nasnet_base(Stream& graph, HParams net_params){
     // Calculate the total number of cells in the network
     // Add 2 for the reduction cell and add additional 2 for the stem cells
     int total_num_cells = net_params.num_cells + 2 + 2;
