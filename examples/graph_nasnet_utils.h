@@ -116,6 +116,8 @@ TensorShape get_tail_shape(std::shared_ptr<SubStream> layer){
     return node->output(0)->desc().shape;
 }
 
+// size_t get_layer_shape_channel()
+
 void print_tensor_shape(TensorShape shape){
     printf("[%ld, %ld, %ld, %ld]\n", shape[0], shape[1], shape[2], shape[3]);
 }
@@ -200,8 +202,9 @@ public:
         if(stride > 1 && !is_from_original_input){
             stride = 1;
         }
+        graph = std::shared_ptr<SubStream>(new SubStream(*graph));
         // Assume NCHW
-        int input_filters = get_tail_shape(graph)[1];
+        int input_filters = get_tail_shape(graph)[2];
         ARM_COMPUTE_ERROR_ON(input_filters==0);
         auto filter_size = this->_filter_size;
         if(operation.find("separable", 0) != std::string::npos){
@@ -236,17 +239,17 @@ public:
     std::shared_ptr<SubStream> _combine_unused_states(std::vector<std::shared_ptr<SubStream>> net, std::string prefix){
         std::vector<int> used_hiddenstates = _used_hiddenstates;
         // We assume tensor in NCHW format
-        auto final_height = get_tail_shape(net.back())[2];
+        auto final_height = get_tail_shape(net.back())[0];
         ARM_COMPUTE_ERROR_ON(final_height==0);
-        auto final_num_filters = get_tail_shape(net.back())[1];
+        auto final_num_filters = get_tail_shape(net.back())[2];
         ARM_COMPUTE_ERROR_ON(final_num_filters == 0);
         assert(net.size() == used_hiddenstates.size());
         
         for(uint64_t idx = 0; idx < used_hiddenstates.size(); idx++){
             auto used_h = used_hiddenstates[idx];
-            auto current_height = get_tail_shape(net[idx])[2];
+            auto current_height = get_tail_shape(net[idx])[0];
             ARM_COMPUTE_ERROR_ON(current_height==0);
-            auto current_num_filters = get_tail_shape(net[idx])[1];
+            auto current_num_filters = get_tail_shape(net[idx])[2];
             ARM_COMPUTE_ERROR_ON(current_num_filters==0);
             
             // Determin if a reduction should be applied to make the number of filters match
@@ -257,16 +260,21 @@ public:
             if(should_reduce){
                 int stride = (final_height != current_height ? 2: 1);
                 std::string name_scope = prefix+"_reducetion_" + std::to_string(idx);
-                factorized_reduction((net[idx]), final_num_filters,
+                net[idx] = factorized_reduction((net[idx]), final_num_filters,
                     stride, DataLayout::NCHW, name_scope);
             }
         }
-        std::shared_ptr<SubStream> out(net[0]);
+        std::shared_ptr<SubStream> out(new SubStream(*(net[0])));
         std::vector<std::shared_ptr<SubStream>> states_to_combine;
         for(size_t i=0; i<net.size(); ++i){
             if(!used_hiddenstates[i]){
                 states_to_combine.push_back(net[i]);
             }
+        }
+        printf("_combine_unused_states\n");
+        for(size_t i = 0; i<states_to_combine.size(); ++i){
+            printf("i:%zu ", i);
+            print_tensor_shape(get_tail_shape(states_to_combine[i]));
         }
         switch (states_to_combine.size())
         {
@@ -311,6 +319,7 @@ public:
         _cell_num = cell_num;
         _filter_scaling = filter_scaling;
         _filter_size = (int)(_num_conv_filters * filter_scaling);
+        printf("cell_num:%d filter_scaling:%f stride:%d\n", cell_num, filter_scaling, stride);
         printf("Before cell base net:");
         print_tensor_shape(get_tail_shape(graph));
         if(prev_layer != nullptr){
@@ -353,9 +362,10 @@ public:
         int num_filters = this->_filter_size;
         
         // Check to be sure prev layer stuff is setup correctly
-        prev_layer = _reduce_prev_layer(prev_layer, graph, prefix+"_reduce_prev_layer_");
+        prev_layer = std::shared_ptr<SubStream>(new SubStream(*_reduce_prev_layer(prev_layer, graph, prefix+"_reduce_prev_layer_")));
         printf("After _reduce_prev_layer: ");
         print_tensor_shape(get_tail_shape(prev_layer));
+        printf("\n");
         // We directly use relu here
         *graph << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU));
         *graph << ConvolutionLayer(1U, 1U, num_filters,
@@ -363,6 +373,7 @@ public:
                 std::make_unique<DummyAccessor>(), 
                 PadStrideInfo(1, 1, 0, 0))
                 .set_name(prefix+"1x1");
+        graph = std::shared_ptr<SubStream>(new SubStream(*graph));
         return {graph, prev_layer};
     }
     
@@ -378,15 +389,19 @@ public:
         }
         uint64_t curr_num_filters = this->_filter_size;
         // Assert NCHW
-        auto prev_num_filters = get_tail_shape(prev_layer)[1];
+        auto prev_num_filters = get_tail_shape(prev_layer)[2];
         ARM_COMPUTE_ERROR_ON(prev_num_filters == 0);
-        auto current_filter_shape = get_tail_shape(current_layer)[2];
+        auto current_filter_shape = get_tail_shape(current_layer)[0];
         ARM_COMPUTE_ERROR_ON(current_filter_shape == 0);
-        auto prev_filter_shape = get_tail_shape(prev_layer)[2];
+        auto prev_filter_shape = get_tail_shape(prev_layer)[0];
 
         if(current_filter_shape != prev_filter_shape){
             (*prev_layer) << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU));
-            factorized_reduction(prev_layer, curr_num_filters, 2, DataLayout::NCHW, prefix + "_prev_1x1_");
+            printf("_reduce_prev_layer before factorized_reduction prev_layer\n");
+            print_tensor_shape(get_tail_shape(prev_layer));
+            prev_layer = factorized_reduction(prev_layer, curr_num_filters, 2, DataLayout::NCHW, prefix + "_prev_1x1_");
+            printf("_reduce_prev_layer after factorized_reduction prev_layer\n");
+            print_tensor_shape(get_tail_shape(prev_layer));
         }else if(curr_num_filters != prev_num_filters){
             (*prev_layer) << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU));
             (*prev_layer) << ConvolutionLayer(1, 1, curr_num_filters,
@@ -401,6 +416,7 @@ public:
     std::shared_ptr<SubStream> factorized_reduction(std::shared_ptr<SubStream> graph, int output_filters, int stride, DataLayout data_format, std::string prefix){
         ARM_COMPUTE_ERROR_ON(data_format != DataLayout::NCHW);
         if(stride == 1){
+            graph = std::shared_ptr<SubStream>(new SubStream(*graph));
             *graph<< ConvolutionLayer(1, 1, output_filters, 
                 std::make_unique<DummyAccessor>(), 
                 std::make_unique<DummyAccessor>(), 
@@ -409,6 +425,7 @@ public:
             return graph;
         }
         // Skip path 1
+        std::shared_ptr<SubStream> final_path(new SubStream(*graph));
         SubStream path1(*graph);
         path1 << PoolingLayer(
                     PoolingLayerInfo(
@@ -420,15 +437,19 @@ public:
                 std::make_unique<DummyAccessor>(), 
                 PadStrideInfo(1, 1, 0, 0))
                 .set_name(prefix+"path1_conv");
+        printf("path1\n");
+        print_tensor_shape(get_tail_shape(std::shared_ptr<SubStream>(new SubStream(path1))));
         // Skip path 2
         ARM_COMPUTE_ERROR_ON(data_format != DataLayout::NCHW);
         SubStream path2(*graph);
-        path2 << PadLayer({{0, 0}, {0, 0}, {0, 1}, {0, 1}});
+        // path2 << PadLayer({{0, 1}, {0, 1}, {0, 0}, {0, 0}});
+        // path2 << PadLayer({ {0, 0}, {0, 0}, {0, 1}, {0, 1}});
         path2 << PoolingLayer(
                     PoolingLayerInfo(
                         PoolingType::AVG, Size2D(1,1), 
                         DataLayout::NCHW, PadStrideInfo(stride, stride, 0, 0)))
                         .set_name(prefix+"path2_pooling");
+        
         // If odd number of filters, add an additional one to the second path
         int final_filter_size = (output_filters / 2) + (output_filters % 2);
         path2 << ConvolutionLayer(1U, 1U, final_filter_size,
@@ -436,9 +457,11 @@ public:
                 std::make_unique<DummyAccessor>(), 
                 PadStrideInfo(1, 1, 0, 0))
                 .set_name(prefix+"path2_conv");
+        printf("path2\n");
+        print_tensor_shape(get_tail_shape(std::shared_ptr<SubStream>(new SubStream(path2))));
         // Concat
-        *graph << ConcatLayer(std::move(path1), std::move(path2)).set_name(prefix + "concat");
-        return graph;
+        *final_path << ConcatLayer(std::move(path1), std::move(path2)).set_name(prefix + "concat");
+        return final_path;
     }
 
 private:
@@ -499,6 +522,112 @@ public:
         
     }
 };
+
+
+struct Net_And_CellOutputs {
+    std::shared_ptr<SubStream> net;
+    std::vector<std::shared_ptr<SubStream>> cell_output;
+};
+
+template<typename T>
+bool vector_find(std::vector<T>& vec, T val){
+    for(auto num: vec){
+        if(val == num){
+            return true;
+        }
+    }
+    return false;
+}
+
+Net_And_CellOutputs _imagenet_stem(std::shared_ptr<SubStream> graph, HParams hparams,
+                                NasNetABaseCell stem, std::string prefix){
+    int num_stem_cells = 2;
+    int num_stem_filters = 32 * hparams.stem_multiplier;
+    
+    *graph << ConvolutionLayer(
+            3U, 3U, num_stem_filters,
+            std::make_unique<DummyAccessor>(), 
+            std::make_unique<DummyAccessor>(), 
+            PadStrideInfo(2, 2, 0, 0)).set_name(prefix +"_conv1");
+    // Run the reduction cells
+    std::vector<std::shared_ptr<SubStream>> cell_outputs = {nullptr, std::shared_ptr<SubStream>(new SubStream(*graph))};
+    print_tensor_shape(get_tail_shape(graph));//point 1
+    auto filter_scaling = 1.0 / std::pow(hparams.filter_scaling_rate, num_stem_cells);
+    for(int cell_num=0; cell_num<num_stem_cells;cell_num++){
+        graph = stem(graph, prefix+std::to_string(cell_num), 
+            filter_scaling, 2, cell_outputs[cell_outputs.size()-2], cell_num, nullptr);
+        // TODO(Chunwei xia) verify it
+        // cell_outputs.push_back(graph);
+        cell_outputs.push_back(std::shared_ptr<SubStream>(new SubStream(*graph)));
+        filter_scaling = filter_scaling * hparams.filter_scaling_rate;
+    }
+    return Net_And_CellOutputs{graph, cell_outputs};
+}
+
+void build_nasnet_base(SubStream& graph, HParams net_params){
+    // Calculate the total number of cells in the network
+    // Add 2 for the reduction cell and add additional 2 for the stem cells
+    int total_num_cells = net_params.num_cells + 2 + 2;
+    
+    NasNetANormalCell normal_cell(net_params.num_conv_filters, net_params.drop_path_keep_prob,
+        total_num_cells, 1, false);
+    NasNetAReductionCell reduction_cell(net_params.num_conv_filters, net_params.drop_path_keep_prob,
+        total_num_cells, 1, false);
+
+    std::shared_ptr<SubStream> net(new SubStream(graph));
+    // NasNetAReductionCell stem_cell(net_params.num_conv_filters, net_params.drop_path_keep_prob,
+    //     total_num_cells, 1, false);
+    auto net_and_cell_outputs = _imagenet_stem(net, net_params, reduction_cell, "imagenet_stem");
+    
+    auto reduction_indices = calc_reduction_layers(net_params.num_cells, net_params.num_reduction_layers);
+    std::vector<int> aux_head_cell_idxes;
+    if (reduction_indices.size() >= 2){
+        aux_head_cell_idxes.push_back(reduction_indices[1] - 1);
+    }
+    
+    // Run the cells
+    float filter_scaling = 1.0;
+    int true_cell_num = 2;
+    
+    net = (net_and_cell_outputs.net);
+    for(int cell_num=0; cell_num<net_params.num_cells; ++cell_num){
+        int stride = 1;
+        std::shared_ptr<SubStream> prev_layer;
+        if(net_params.skip_reduction_layer_input){
+            prev_layer = net_and_cell_outputs.cell_output[net_and_cell_outputs.cell_output.size()-2];
+        }
+        
+        if(vector_find<int>(reduction_indices, cell_num)){
+            filter_scaling *= net_params.filter_scaling_rate;
+            net = reduction_cell(net, "reduction_cell_"+std::to_string(reduction_indices[cell_num]),
+                filter_scaling, 2, net_and_cell_outputs.cell_output[net_and_cell_outputs.cell_output.size()-2],
+                true_cell_num, nullptr);
+            true_cell_num += 1;
+            net_and_cell_outputs.cell_output.push_back(std::shared_ptr<SubStream>(new SubStream(*net)));
+        }
+        
+        if(!net_params.skip_reduction_layer_input){
+            prev_layer = net_and_cell_outputs.cell_output[net_and_cell_outputs.cell_output.size()-2];
+        }
+        net = normal_cell(net, "cell_"+std::to_string(cell_num),
+            filter_scaling, stride, prev_layer, true_cell_num, nullptr);
+        // if add_and_check_endpoint('Cell_{}'.format(cell_num), net):
+        //     return net, end_points
+        true_cell_num += 1;
+        // Omit the operation only needed for training
+        net_and_cell_outputs.cell_output.push_back(std::shared_ptr<SubStream>(new SubStream(*net)));
+    }
+    printf("before final_layer\n");
+    print_tensor_shape(get_tail_shape(net));
+    *net << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU));
+    *net << PoolingLayer(PoolingLayerInfo(PoolingType::AVG, 11, DataLayout::NCHW, PadStrideInfo(1, 1, 0, 0)));
+    *net << FullyConnectedLayer(1001, std::make_unique<DummyAccessor>(), 
+        std::make_unique<DummyAccessor>());
+    printf("before fc\n");
+    print_tensor_shape(get_tail_shape(net));
+    SubStream help_ss(*net);
+    graph << ConcatLayer(std::move(*net), std::move(help_ss));
+}
 
 
 #endif

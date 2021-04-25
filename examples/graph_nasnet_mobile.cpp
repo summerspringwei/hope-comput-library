@@ -36,23 +36,24 @@ using namespace arm_compute::utils;
 using namespace arm_compute::graph::frontend;
 using namespace arm_compute::graph_utils;
 
+
 /** Example demonstrating how to implement InceptionV3's network using the Compute Library's graph API */
-class NasnetLargeExample : public Example
+class NasnetMobileExample : public Example
 {
 public:
-    NasnetLargeExample()
-        : cmd_parser(), common_opts(cmd_parser), common_params(), graph(0, "NasnetLarge")
+    NasnetMobileExample()
+        : cmd_parser(), common_opts(cmd_parser), common_params(), graph(0, "NasnetMobile")
     {
         net_params = HParams{
-            3,   // int stem_multiplier;
-            18,  // int num_cells;
+            1,   // int stem_multiplier;
+            12,  // int num_cells;
             2,   // int filter_scaling_rate;
-            168, // int num_conv_filters;
-            0.7, // float drop_path_keep_prob;
+            44, // int num_conv_filters;
+            1.0, // float drop_path_keep_prob;
             1,   // int use_aux_head;
             2,   // int num_reduction_layers;
             DataLayout::NCHW, // DataLayout data_format;
-            1    // int skip_reduction_layer_input;                    
+            0    // int skip_reduction_layer_input;                    
         };
     }
     bool do_setup(int argc, char **argv) override
@@ -141,6 +142,7 @@ public:
             //     return net, end_points
             true_cell_num += 1;
             // Omit the operation only needed for training
+            
             net_and_cell_outputs.cell_output.push_back(std::shared_ptr<SubStream>(new SubStream(*net)));
         }
         printf("before final_layer\n");
@@ -205,5 +207,5 @@ private:
  */
 int main(int argc, char **argv)
 {
-    return arm_compute::utils::run_example<NasnetLargeExample>(argc, argv);
+    return arm_compute::utils::run_example<NasnetMobileExample>(argc, argv);
 }

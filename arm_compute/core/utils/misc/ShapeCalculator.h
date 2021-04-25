@@ -1361,6 +1361,9 @@ inline TensorShape calculate_concatenate_shape(const std::vector<T *> &input, si
         {
             ARM_COMPUTE_ERROR_ON(tensor == nullptr);
             const TensorShape shape = extract_shape(tensor);
+            if(out_shape[i] != shape[i]){
+                printf("Error out_shape[i] != shape[i]\n");
+            }
             ARM_COMPUTE_ERROR_ON(out_shape[i] != shape[i]);
         }
     }
