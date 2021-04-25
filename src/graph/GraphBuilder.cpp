@@ -224,6 +224,9 @@ NodeID GraphBuilder::add_convolution_node(Graph &g, NodeParams params, NodeIdxPa
                                           const QuantizationInfo &out_quant_info)
 {
     check_nodeidx_pair(input, g);
+    if(depth==0){
+        printf("Error\n conv depth==0");        
+    }
     ARM_COMPUTE_ERROR_ON(depth == 0);
     ARM_COMPUTE_ERROR_ON((kernel_spatial_extend.width == 0) || (kernel_spatial_extend.height == 0));
 

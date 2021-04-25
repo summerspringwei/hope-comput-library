@@ -93,6 +93,9 @@ TensorDescriptor EltwiseLayerNode::configure_output(size_t idx) const
     auto output_info = src1->desc();
 
     TensorShape out_shape = TensorShape::broadcast_shape(src1->desc().shape, src2->desc().shape);
+    if(out_shape.total_size() == 0){
+        printf("Error out_shape.total_size() == 0 \n");
+    }
     ARM_COMPUTE_ERROR_ON_MSG(out_shape.total_size() == 0, "Inputs are not broadcast compatible");
 
     output_info.set_shape(out_shape);

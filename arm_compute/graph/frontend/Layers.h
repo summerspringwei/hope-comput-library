@@ -34,6 +34,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace arm_compute
 {
@@ -309,6 +310,14 @@ public:
         },
         std::move(rest_sub_streams)...);
     }
+    // template <typename... Ts>
+    // ConcatLayer(std::vector<SubStream&&> sub_stream_vec)
+    //     : _sub_streams(), _concat_descriptor(DataLayoutDimension::CHANNEL)
+    // {
+    //     for(SubStream&& sub_stream: sub_stream_vec){
+    //         _sub_streams.push_back(std::make_unique<SubStream>(std::move(sub_stream)));
+    //     }
+    // }
     /** Construct a concatenation layer
      *
      * @param[in] concat_descriptor Concat layer descriptor
