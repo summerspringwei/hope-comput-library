@@ -6,6 +6,7 @@
 #include "utils/CommonGraphOptions.h"
 #include "utils/GraphUtils.h"
 #include "utils/Utils.h"
+#include "arm_compute/core/Log.h"
 
 using namespace arm_compute::utils;
 using namespace arm_compute::graph::frontend;
@@ -89,14 +90,17 @@ std::shared_ptr<SubStream> _pooling(std::shared_ptr<SubStream> graph, int stride
     auto pooling_type_str = pooling_info_str[0];
     int pooling_shape = atoi(pooling_info_str[1].c_str());
     if(use_bounded_activation){
-        *graph<<ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU, 0, 6));
+        *graph<<ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU, 0, 6))
+            .set_name(prefix+"relu");
     }
     if(pooling_type_str=="avg"){
         *graph<<PoolingLayer(PoolingLayerInfo(PoolingType::AVG, pooling_shape, DataLayout::NCHW, 
-            PadStrideInfo(stride, stride, pooling_shape / 2, pooling_shape / 2)));// Padding SAME
+            PadStrideInfo(stride, stride, pooling_shape / 2, pooling_shape / 2)))
+            .set_name(prefix+"avgpool_"+std::to_string(pooling_shape));// Padding SAME
     }else if(pooling_type_str == "max"){
         *graph<<PoolingLayer(PoolingLayerInfo(PoolingType::MAX, pooling_shape, DataLayout::NCHW, 
-            PadStrideInfo(stride, stride, pooling_shape / 2, pooling_shape / 2)));// Padding SAME
+            PadStrideInfo(stride, stride, pooling_shape / 2, pooling_shape / 2)))
+            .set_name(prefix+"maxpool_"+std::to_string(pooling_shape));// Padding SAME
     }else{
         ARM_COMPUTE_ERROR(("Unimplemented pooling type" +pooling_type_str).c_str());
     }
@@ -119,7 +123,8 @@ TensorShape get_tail_shape(std::shared_ptr<SubStream> layer){
 // size_t get_layer_shape_channel()
 
 void print_tensor_shape(TensorShape shape){
-    printf("[%ld, %ld, %ld, %ld]\n", shape[0], shape[1], shape[2], shape[3]);
+    ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("[%ld, %ld, %ld, %ld]\n", shape[0], shape[1], shape[2], shape[3]);
+    ARM_COMPUTE_UNUSED(shape);
 }
 
 /**
@@ -161,31 +166,33 @@ public:
         
         std::stringstream ss;
         for(int layer_num = 0; layer_num < num_layers - 1; layer_num++){
-            *graph << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU));
-            ss.clear();
+            *graph << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU))
+                .set_name(prefix+"bf_relu_"+std::to_string(layer_num));
+            ss.str("");
             ss << prefix << "separable_depthwise" << kernel_size << "x" << kernel_size << "_" << (layer_num+1);
             *graph << DepthwiseConvolutionLayer(kernel_size, kernel_size,
                 std::make_unique<DummyAccessor>(), 
                 std::make_unique<DummyAccessor>(), 
                 PadStrideInfo(stride, stride, kernel_size / 2, kernel_size / 2)
             ).set_name(ss.str());
-            ss.clear();
+            ss.str("");
             ss << prefix << "separable_pointwise" << kernel_size << "x" << kernel_size << "_" << (layer_num+1);
             *graph << ConvolutionLayer(1U, 1U, filter_size,
                 std::make_unique<DummyAccessor>(), 
                 std::make_unique<DummyAccessor>(), 
                 PadStrideInfo(1, 1, 0, 0)).set_name(ss.str());
-            *graph << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU));
+            *graph << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU))
+                .set_name(prefix+"af_relu_"+std::to_string(layer_num));;
             stride = 1;
         }
-        ss.clear();
+        ss.str("");
         ss << prefix << "separable_depthwise" << kernel_size << "x" << kernel_size << "_" << (num_layers);
         *graph << DepthwiseConvolutionLayer(kernel_size, kernel_size,
             std::make_unique<DummyAccessor>(), 
             std::make_unique<DummyAccessor>(), 
             PadStrideInfo(stride, stride, kernel_size / 2, kernel_size / 2)
         ).set_name(ss.str());
-        ss.clear();
+        ss.str("");
         ss << prefix << "separable_pointwise" << kernel_size << "x" << kernel_size << "_" << (num_layers);
         *graph << ConvolutionLayer(1U, 1U, filter_size,
             std::make_unique<DummyAccessor>(), 
@@ -211,15 +218,16 @@ public:
             _stacked_separable_conv(graph, stride, operation, filter_size, false, prefix);
         }else if(operation.find("none") != std::string::npos){
             if((stride > 1) || (input_filters != filter_size)){
-                *graph << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU));
+                *graph << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU))
+                    .set_name(prefix+"relu");
                 *graph << ConvolutionLayer(1U, 1U, filter_size,
                     std::make_unique<DummyAccessor>(), 
                     std::make_unique<DummyAccessor>(),
                     PadStrideInfo(stride, stride, 0, 0))
-                    .set_name(prefix+"1x1");
+                    .set_name(prefix+"Conv1x1");
             }
         }else if(operation.find("pool") != std::string::npos){
-            _pooling(graph, stride, operation, _used_bounded_activation, prefix+"_pooling_");
+            _pooling(graph, stride, operation, _used_bounded_activation, prefix+"pooling/");
             if(input_filters != filter_size){
                 *graph << ConvolutionLayer(1U, 1U, filter_size,
                     std::make_unique<DummyAccessor>(), 
@@ -271,40 +279,46 @@ public:
                 states_to_combine.push_back(net[i]);
             }
         }
-        printf("_combine_unused_states\n");
+        ARM_COMPUTE_LOG_INFO_MSG_CORE("_combine_unused_states\n");
         for(size_t i = 0; i<states_to_combine.size(); ++i){
-            printf("i:%zu ", i);
+            ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("i:%zu ", i);
             print_tensor_shape(get_tail_shape(states_to_combine[i]));
         }
         switch (states_to_combine.size())
         {
         case 2:
             *out<<ConcatLayer(std::move(*states_to_combine[0]), 
-                        std::move(*states_to_combine[1]));
+                        std::move(*states_to_combine[1]))
+                        .set_name(prefix+"concat");
             break;
         case 3:
             *out<<ConcatLayer(std::move(*states_to_combine[0]), std::move(*states_to_combine[1]),
-                        std::move(*states_to_combine[2]));
+                        std::move(*states_to_combine[2]))
+                        .set_name(prefix+"concat");
             break;
         case 4:
             *out<<ConcatLayer(std::move(*states_to_combine[0]), std::move(*states_to_combine[1]),
-                        std::move(*states_to_combine[2]), std::move(*states_to_combine[3]));
+                        std::move(*states_to_combine[2]), std::move(*states_to_combine[3]))
+                        .set_name(prefix+"concat");
             break;
         case 5:
             *out<<ConcatLayer(std::move(*states_to_combine[0]), std::move(*states_to_combine[1]),
                         std::move(*states_to_combine[2]), std::move(*states_to_combine[3]),
-                        std::move(*states_to_combine[4]));
+                        std::move(*states_to_combine[4]))
+                        .set_name(prefix+"concat");
             break;
         case 6:
             *out<<ConcatLayer(std::move(*states_to_combine[0]), std::move(*states_to_combine[1]),
                         std::move(*states_to_combine[2]), std::move(*states_to_combine[3]),
-                        std::move(*states_to_combine[4]), std::move(*states_to_combine[5]));
+                        std::move(*states_to_combine[4]), std::move(*states_to_combine[5]))
+                        .set_name(prefix+"concat");
             break;
         case 7:
             *out<<ConcatLayer(std::move(*states_to_combine[0]), std::move(*states_to_combine[1]),
                         std::move(*states_to_combine[2]), std::move(*states_to_combine[3]),
                         std::move(*states_to_combine[4]), std::move(*states_to_combine[5]),
-                        std::move(*states_to_combine[6]));
+                        std::move(*states_to_combine[6]))
+                        .set_name(prefix+"concat");
         default:
             ARM_COMPUTE_ERROR("Size of states_to_combine out of range\n");
             break;
@@ -319,17 +333,17 @@ public:
         _cell_num = cell_num;
         _filter_scaling = filter_scaling;
         _filter_size = (int)(_num_conv_filters * filter_scaling);
-        printf("cell_num:%d filter_scaling:%f stride:%d\n", cell_num, filter_scaling, stride);
-        printf("Before cell base net:");
+        ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("cell_num:%d filter_scaling:%f stride:%d\n", cell_num, filter_scaling, stride);
+        ARM_COMPUTE_LOG_INFO_MSG_CORE("Before cell base net:");
         print_tensor_shape(get_tail_shape(graph));
         if(prev_layer != nullptr){
-            printf("Before cell base prev_layer:");
+            ARM_COMPUTE_LOG_INFO_MSG_CORE("Before cell base prev_layer:");
             print_tensor_shape(get_tail_shape(prev_layer));
         }
-        auto net = _cell_base(graph, prev_layer, prefix+"_cell_base_");
+        auto net = _cell_base(graph, prev_layer, prefix+"cell_base/");
         
         for(int i=0; i<10; i+=2){
-            std::string name_scope = prefix + "comb_iter_"+std::to_string(i);
+            std::string name_scope = prefix + "comb_iter_"+std::to_string(i) + "/";
             int left_hiddenstate_idx = _hiddenstate_indices[i];
             int right_hiddenstate_idx = _hiddenstate_indices[i+1];
             bool original_input_left = left_hiddenstate_idx < 2? true: false;
@@ -339,21 +353,21 @@ public:
             
             std::string operation_left = _operations[i];
             std::string operation_right = _operations[i+1];
-            printf("before cell_num:%d i:%d\n", cell_num, i);
+            ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("before cell_num:%d i:%d\n", cell_num, i);
             print_tensor_shape(get_tail_shape(h1));
             print_tensor_shape(get_tail_shape(h2));
-            h1 = _apply_conv_operation(h1, operation_left, stride, original_input_left, current_step, name_scope+"left");
-            h2 = _apply_conv_operation(h2, operation_right, stride, original_input_right, current_step, name_scope+"right");
-            printf("after cell_num:%d i:%d\n", cell_num, i);
+            h1 = _apply_conv_operation(h1, operation_left, stride, original_input_left, current_step, name_scope+"left/");
+            h2 = _apply_conv_operation(h2, operation_right, stride, original_input_right, current_step, name_scope+"right/");
+            ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("after cell_num:%d i:%d\n", cell_num, i);
             print_tensor_shape(get_tail_shape(h1));
             print_tensor_shape(get_tail_shape(h2));
             // Combine hidden states using 'add'
             // std::shared_ptr<SubStream> h(h1);
             std::shared_ptr<SubStream> h(new SubStream(*h1));
-            *h << EltwiseLayer(std::move(*h1), std::move(*h2), EltwiseOperation::Add);
+            *h << EltwiseLayer(std::move(*h1), std::move(*h2), EltwiseOperation::Add).set_name(name_scope+"add");
             net.push_back(h);
         }
-        return _combine_unused_states(net, prefix + "cell_output");
+        return _combine_unused_states(net, prefix + "cell_output/");
     }
     
     // Code check pass.
@@ -363,16 +377,18 @@ public:
         
         // Check to be sure prev layer stuff is setup correctly
         prev_layer = std::shared_ptr<SubStream>(new SubStream(*_reduce_prev_layer(prev_layer, graph, prefix+"_reduce_prev_layer_")));
-        printf("After _reduce_prev_layer: ");
+        ARM_COMPUTE_LOG_INFO_MSG_CORE("After _reduce_prev_layer: ");
         print_tensor_shape(get_tail_shape(prev_layer));
-        printf("\n");
+        
+        ARM_COMPUTE_LOG_INFO_MSG_CORE("\n");
         // We directly use relu here
-        *graph << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU));
+        *graph << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU))
+            .set_name(prefix+"relu");
         *graph << ConvolutionLayer(1U, 1U, num_filters,
                 std::make_unique<DummyAccessor>(), 
                 std::make_unique<DummyAccessor>(), 
                 PadStrideInfo(1, 1, 0, 0))
-                .set_name(prefix+"1x1");
+                .set_name(prefix+"Conv1x1");
         graph = std::shared_ptr<SubStream>(new SubStream(*graph));
         return {graph, prev_layer};
     }
@@ -396,18 +412,21 @@ public:
         auto prev_filter_shape = get_tail_shape(prev_layer)[0];
 
         if(current_filter_shape != prev_filter_shape){
-            (*prev_layer) << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU));
-            printf("_reduce_prev_layer before factorized_reduction prev_layer\n");
+            (*prev_layer) << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU))
+                .set_name(prefix+"relue");
+            ARM_COMPUTE_LOG_INFO_MSG_CORE("_reduce_prev_layer before factorized_reduction prev_layer\n");
             print_tensor_shape(get_tail_shape(prev_layer));
-            prev_layer = factorized_reduction(prev_layer, curr_num_filters, 2, DataLayout::NCHW, prefix + "_prev_1x1_");
-            printf("_reduce_prev_layer after factorized_reduction prev_layer\n");
+            prev_layer = factorized_reduction(prev_layer, curr_num_filters, 2, DataLayout::NCHW, prefix + "prev_1x1_");
+            ARM_COMPUTE_LOG_INFO_MSG_CORE("_reduce_prev_layer after factorized_reduction prev_layer\n");
             print_tensor_shape(get_tail_shape(prev_layer));
         }else if(curr_num_filters != prev_num_filters){
-            (*prev_layer) << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU));
+            (*prev_layer) << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU))
+                .set_name(prefix+"relu");
             (*prev_layer) << ConvolutionLayer(1, 1, curr_num_filters,
                             std::make_unique<DummyAccessor>(), 
                             std::make_unique<DummyAccessor>(), 
-                            PadStrideInfo(1, 1, 0, 0));
+                            PadStrideInfo(1, 1, 0, 0))
+                            .set_name(prefix+"Conv1x1");
         }
         return prev_layer;
     }
@@ -437,7 +456,7 @@ public:
                 std::make_unique<DummyAccessor>(), 
                 PadStrideInfo(1, 1, 0, 0))
                 .set_name(prefix+"path1_conv");
-        printf("path1\n");
+        ARM_COMPUTE_LOG_INFO_MSG_CORE("path1\n");
         print_tensor_shape(get_tail_shape(std::shared_ptr<SubStream>(new SubStream(path1))));
         // Skip path 2
         ARM_COMPUTE_ERROR_ON(data_format != DataLayout::NCHW);
@@ -457,7 +476,7 @@ public:
                 std::make_unique<DummyAccessor>(), 
                 PadStrideInfo(1, 1, 0, 0))
                 .set_name(prefix+"path2_conv");
-        printf("path2\n");
+        ARM_COMPUTE_LOG_INFO_MSG_CORE("path2\n");
         print_tensor_shape(get_tail_shape(std::shared_ptr<SubStream>(new SubStream(path2))));
         // Concat
         *final_path << ConcatLayer(std::move(path1), std::move(path2)).set_name(prefix + "concat");
@@ -554,10 +573,8 @@ Net_And_CellOutputs _imagenet_stem(std::shared_ptr<SubStream> graph, HParams hpa
     print_tensor_shape(get_tail_shape(graph));//point 1
     auto filter_scaling = 1.0 / std::pow(hparams.filter_scaling_rate, num_stem_cells);
     for(int cell_num=0; cell_num<num_stem_cells;cell_num++){
-        graph = stem(graph, prefix+std::to_string(cell_num), 
+        graph = stem(graph, prefix +"_"+std::to_string(cell_num)+"/", 
             filter_scaling, 2, cell_outputs[cell_outputs.size()-2], cell_num, nullptr);
-        // TODO(Chunwei xia) verify it
-        // cell_outputs.push_back(graph);
         cell_outputs.push_back(std::shared_ptr<SubStream>(new SubStream(*graph)));
         filter_scaling = filter_scaling * hparams.filter_scaling_rate;
     }
@@ -577,7 +594,7 @@ void build_nasnet_base(Stream& graph, HParams net_params){
     std::shared_ptr<SubStream> net(new SubStream(graph));
     // NasNetAReductionCell stem_cell(net_params.num_conv_filters, net_params.drop_path_keep_prob,
     //     total_num_cells, 1, false);
-    auto net_and_cell_outputs = _imagenet_stem(net, net_params, reduction_cell, "imagenet_stem");
+    auto net_and_cell_outputs = _imagenet_stem(net, net_params, reduction_cell, "cell_stem");
     
     auto reduction_indices = calc_reduction_layers(net_params.num_cells, net_params.num_reduction_layers);
     std::vector<int> aux_head_cell_idxes;
@@ -588,7 +605,7 @@ void build_nasnet_base(Stream& graph, HParams net_params){
     // Run the cells
     float filter_scaling = 1.0;
     int true_cell_num = 2;
-    
+    int reduction_cell_count = 0;
     net = (net_and_cell_outputs.net);
     for(int cell_num=0; cell_num<net_params.num_cells; ++cell_num){
         int stride = 1;
@@ -599,7 +616,7 @@ void build_nasnet_base(Stream& graph, HParams net_params){
         
         if(vector_find<int>(reduction_indices, cell_num)){
             filter_scaling *= net_params.filter_scaling_rate;
-            net = reduction_cell(net, "reduction_cell_"+std::to_string(reduction_indices[cell_num]),
+            net = reduction_cell(net, "reduction_cell_"+std::to_string(reduction_cell_count++)+"/",
                 filter_scaling, 2, net_and_cell_outputs.cell_output[net_and_cell_outputs.cell_output.size()-2],
                 true_cell_num, nullptr);
             true_cell_num += 1;
@@ -609,7 +626,7 @@ void build_nasnet_base(Stream& graph, HParams net_params){
         if(!net_params.skip_reduction_layer_input){
             prev_layer = net_and_cell_outputs.cell_output[net_and_cell_outputs.cell_output.size()-2];
         }
-        net = normal_cell(net, "cell_"+std::to_string(cell_num),
+        net = normal_cell(net, "cell_"+std::to_string(cell_num)+"/",
             filter_scaling, stride, prev_layer, true_cell_num, nullptr);
         // if add_and_check_endpoint('Cell_{}'.format(cell_num), net):
         //     return net, end_points
@@ -617,16 +634,21 @@ void build_nasnet_base(Stream& graph, HParams net_params){
         // Omit the operation only needed for training
         net_and_cell_outputs.cell_output.push_back(std::shared_ptr<SubStream>(new SubStream(*net)));
     }
-    printf("before final_layer\n");
+    ARM_COMPUTE_LOG_INFO_MSG_CORE("before final_layer\n");
     print_tensor_shape(get_tail_shape(net));
-    *net << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU));
-    *net << PoolingLayer(PoolingLayerInfo(PoolingType::AVG, 11, DataLayout::NCHW, PadStrideInfo(1, 1, 0, 0)));
+    std::string final_layer_str = "final_layer/";
+    *net << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU))
+        .set_name(final_layer_str+"relu");
+    *net << PoolingLayer(PoolingLayerInfo(PoolingType::AVG, 11, DataLayout::NCHW, PadStrideInfo(1, 1, 0, 0)))
+        .set_name(final_layer_str+"pooling");
     *net << FullyConnectedLayer(1001, std::make_unique<DummyAccessor>(), 
-        std::make_unique<DummyAccessor>());
-    printf("before fc\n");
+        std::make_unique<DummyAccessor>())
+        .set_name(final_layer_str+"FullyConnected");
+    ARM_COMPUTE_LOG_INFO_MSG_CORE("before fc\n");
     print_tensor_shape(get_tail_shape(net));
     SubStream help_ss(*net);
-    graph << ConcatLayer(std::move(*net), std::move(help_ss));
+    graph << ConcatLayer(std::move(*net), std::move(help_ss))
+        .set_name(final_layer_str+"Concat");
 }
 
 
