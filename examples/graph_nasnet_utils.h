@@ -592,8 +592,6 @@ void build_nasnet_base(Stream& graph, HParams net_params){
         total_num_cells, 1, false);
 
     std::shared_ptr<SubStream> net(new SubStream(graph));
-    // NasNetAReductionCell stem_cell(net_params.num_conv_filters, net_params.drop_path_keep_prob,
-    //     total_num_cells, 1, false);
     auto net_and_cell_outputs = _imagenet_stem(net, net_params, reduction_cell, "cell_stem");
     
     auto reduction_indices = calc_reduction_layers(net_params.num_cells, net_params.num_reduction_layers);
@@ -649,7 +647,84 @@ void build_nasnet_base(Stream& graph, HParams net_params){
     SubStream help_ss(*net);
     graph << ConcatLayer(std::move(*net), std::move(help_ss))
         .set_name(final_layer_str+"Concat");
+    graph<< SoftmaxLayer().set_name(final_layer_str + "predictions");
 }
 
+class PNasNetNormalCell: public NasNetABaseCell{
+    public:
+    PNasNetNormalCell(int num_conv_filters, float drop_path_keep_prob, int total_num_cells,
+        int total_training_steps, bool use_bound_activation=false): 
+        NasNetABaseCell(num_conv_filters, {
+            "separable_5x5_2", "max_pool_3x3", "separable_7x7_2", "max_pool_3x3",
+            "separable_5x5_2", "separable_3x3_2", "separable_3x3_2", "max_pool_3x3",
+            "separable_3x3_2", "none"
+        }, {1, 1, 0, 0, 0, 0, 0},
+            {1, 1, 0, 0, 0, 0, 4, 0, 1, 0}, 
+            drop_path_keep_prob, total_num_cells, 
+            total_training_steps, use_bound_activation) {
+
+    }
+};
+
+void build_pnasnet_base(Stream& graph, HParams net_params){
+    std::shared_ptr<SubStream> net(new SubStream(graph));
+    
+    // Calculate the total number of cells in the network
+    // There is no distinction between reduction and normal cells in PNAS,
+    // so the total number of cells is equal to the number of cells plus the
+    // number of stem cells (two by default)
+    int total_num_cells = net_params.num_cells + 2;
+    PNasNetNormalCell normal_cell(net_params.num_conv_filters, net_params.drop_path_keep_prob,
+        total_num_cells, 1, false);
+    
+    auto net_and_cell_outputs = _imagenet_stem(net, net_params, normal_cell, "cell_stem");
+
+    auto reduction_indices = calc_reduction_layers(net_params.num_cells, net_params.num_reduction_layers);
+    //TODO(Chunwei Xia) Setup for building in the auxiliary head
+    std::vector<int> aux_head_cell_idxes;
+    if (reduction_indices.size() >= 2){
+        aux_head_cell_idxes.push_back(reduction_indices[1] - 1);
+    }
+
+    // Run the cells
+    float filter_scaling = 1.0;
+    // true_cell_num accounts for the stem cells
+    int true_cell_num = 2;
+    std::shared_ptr<SubStream> prev_layer = nullptr;
+    net = net_and_cell_outputs.net;
+    for(int cell_num=0; cell_num<net_params.num_cells; ++cell_num){
+        bool is_reduction = vector_find(reduction_indices, cell_num);
+        int stride = 1;
+        if(is_reduction){
+            stride = 2;
+            filter_scaling *= net_params.filter_scaling_rate;
+        }
+        if(net_params.skip_reduction_layer_input or !is_reduction){
+            prev_layer = net_and_cell_outputs.cell_output[net_and_cell_outputs.cell_output.size()-2];
+        }
+        net = normal_cell(net, "cell_"+std::to_string(cell_num)+"/", filter_scaling,
+            stride, prev_layer, true_cell_num, nullptr);
+        true_cell_num += 1;
+        net_and_cell_outputs.cell_output.push_back(std::shared_ptr<SubStream>(new SubStream(*net)));
+    }
+    
+    // TODO(Chunwei Xia) Add the aux_head
+
+
+    std::string final_layer_str = "final_layer/";
+    *net << ActivationLayer(ActivationLayerInfo(ActivationLayerInfo::ActivationFunction::RELU))
+        .set_name(final_layer_str+"relu");
+    *net << PoolingLayer(PoolingLayerInfo(PoolingType::AVG, 11, DataLayout::NCHW, PadStrideInfo(1, 1, 0, 0)))
+        .set_name(final_layer_str+"pooling");
+    *net << FullyConnectedLayer(1001, std::make_unique<DummyAccessor>(), 
+        std::make_unique<DummyAccessor>())
+        .set_name(final_layer_str+"FullyConnected");
+    ARM_COMPUTE_LOG_INFO_MSG_CORE("before fc\n");
+    print_tensor_shape(get_tail_shape(net));
+    SubStream help_ss(*net);
+    graph << ConcatLayer(std::move(*net), std::move(help_ss))
+        .set_name(final_layer_str+"Concat");
+    graph<< SoftmaxLayer().set_name(final_layer_str + "predictions");
+}
 
 #endif
