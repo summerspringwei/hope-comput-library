@@ -285,6 +285,9 @@ inline ::std::ostream &operator<<(::std::ostream &os, const ExecutionType &execu
         case ExecutionType::EXECUTION_TYPE_BIG_LITTLE:
             os << "big_little";
             break;
+        case ExecutionType::EXECUTION_TYPE_ULAYER:
+            os << "ulayer";
+            break;
         default:
             ARM_COMPUTE_ERROR("NOT_SUPPORTED!");
     }

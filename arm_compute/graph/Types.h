@@ -85,6 +85,8 @@ enum class ExecutionType {
     EXECUTION_TYPE_PARALLEL,
     /* BIG_LITTEL: Execute units in parallel using big cores and little core, Not Support yet */
     EXECUTION_TYPE_BIG_LITTLE,
+    /* EXECUTION_TYPE_ULAYER: split the op to CPU and GPU*/
+    EXECUTION_TYPE_ULAYER,
 };
 
 // Forward declarations

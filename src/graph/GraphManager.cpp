@@ -87,7 +87,7 @@ void GraphManager::finalize_graph(Graph &graph, GraphContext &ctx, PassManager &
         force_target_to_graph(graph, forced_target, device_map_ptr);
         setup_neon_and_cl_backend_context(ctx);
     }
-    // Configure all tensors
+    // Configure all tensors, after the pass manager
     detail::configure_all_tensors(graph);
 
     // Apply backend mutating passes

@@ -548,6 +548,7 @@ public:
      * @return Node ID of the created node, EmptyNodeID in case of error
      */
     static NodeID add_split_node(Graph &g, NodeParams params, NodeIdxPair input, unsigned int num_splits, unsigned int axis = 0);
+    static NodeID add_split_node(Graph &g, NodeParams params, NodeIdxPair input, unsigned int num_splits, unsigned int axis, std::vector<int> size_splits);
     /** Adds a stack layer node to the graph
      *
      * @param[in] g      Graph to add the node to

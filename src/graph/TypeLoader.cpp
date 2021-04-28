@@ -83,7 +83,8 @@ ExecutionType execution_type_from_name(std::string &name){
         { "default", ExecutionType::EXECUTION_TYPE_DEFAULT },
         { "serial_hybrid", ExecutionType::EXECUTION_TYPE_SERIAL_HYBRID },
         { "parallel", ExecutionType::EXECUTION_TYPE_PARALLEL },
-        { "big_little", ExecutionType::EXECUTION_TYPE_BIG_LITTLE}
+        { "big_little", ExecutionType::EXECUTION_TYPE_BIG_LITTLE},
+        { "ulayer", ExecutionType::EXECUTION_TYPE_ULAYER}
     };
 
 #ifndef ARM_COMPUTE_EXCEPTIONS_DISABLED

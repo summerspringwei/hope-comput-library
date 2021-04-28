@@ -725,6 +725,12 @@ NodeID GraphBuilder::add_split_node(Graph &g, NodeParams params, NodeIdxPair inp
     return create_simple_single_input_output_node<SplitLayerNode>(g, params, input, num_splits, axis);
 }
 
+NodeID GraphBuilder::add_split_node(Graph &g, NodeParams params, NodeIdxPair input, unsigned int num_splits, unsigned int axis, std::vector<int> size_splits)
+{
+    return create_simple_single_input_output_node<SplitLayerNode>(g, params, input, num_splits, axis, size_splits);
+}
+
+
 NodeID GraphBuilder::add_strided_slice_node(Graph &g, NodeParams params, NodeIdxPair input, Coordinates &starts, Coordinates &ends, BiStrides &strides, StridedSliceLayerInfo info)
 {
     return create_simple_single_input_output_node<StridedSliceLayerNode>(g, params, input, starts, ends, strides, info);

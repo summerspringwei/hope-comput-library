@@ -129,15 +129,11 @@ private:
 
 };
 
-/** Main program for Inception V3
+/** Main program for PNasNet Large
  *
  * Model is based on:
- *      https://arxiv.org/abs/1512.00567
- *      "Rethinking the Inception Architecture for Computer Vision"
- *      Christian Szegedy, Vincent Vanhoucke, Sergey Ioffe, Jonathon Shlens, Zbigniew Wojna
- *
- * Provenance: download.tensorflow.org/models/inception_v3_2016_08_28.tar.gz
- *
+ *      https://github.com/tensorflow/models/tree/master/research/slim/nets/nasnet
+ * We used the default configuration for PNasNet-Large
  * @note To list all the possible arguments execute the binary appended with the --help option
  *
  * @param[in] argc Number of arguments
