@@ -40,6 +40,9 @@ namespace arm_compute
 {
 namespace graph
 {
+
+extern std::string get_target_string(Target);
+
 GraphManager::GraphManager()
     : _workloads()
 {
@@ -65,10 +68,15 @@ void GraphManager::finalize_graph(Graph &graph, GraphContext &ctx, PassManager &
             }
         }
     }
-    
+    ARM_COMPUTE_LOG_GRAPH_INFO("Before depthwise graph nodes: " + std::to_string(graph.nodes().size()) + "\n");
     // Apply IR mutating passes
     pm.run_type(graph, IGraphMutator::MutationType::IR);
-
+    ARM_COMPUTE_LOG_GRAPH_INFO("Before depthwise graph nodes: " + std::to_string(graph.nodes().size()) + "\n");
+    for(auto& node: graph.nodes()){
+        if(node != nullptr){
+            ARM_COMPUTE_LOG_GRAPH_INFO(node->name());
+        }
+    }
     // Force target to all graph construct
     // TODO (COMPMID-2014) : Support heterogeneous execution
     Target forced_target = target;
@@ -86,12 +94,21 @@ void GraphManager::finalize_graph(Graph &graph, GraphContext &ctx, PassManager &
     }else{
         force_target_to_graph(graph, forced_target, device_map_ptr);
         setup_neon_and_cl_backend_context(ctx);
+        auto &nodes = graph.nodes();
+        for(auto& node: nodes) {
+            if(node){
+                
+                if(node->type()!=NodeType::Const && node->type()!=NodeType::Input)
+                ARM_COMPUTE_LOG_GRAPH_INFO(node->name() + " " + get_target_string(node->assigned_target()));
+            }
+            
+        }
     }
     // Configure all tensors, after the pass manager
     detail::configure_all_tensors(graph);
-
+    
     // Apply backend mutating passes
-    // pm.run_type(graph, IGraphMutator::MutationType::Backend);
+    pm.run_type(graph, IGraphMutator::MutationType::Backend);
 
     // Perform topological sort
     std::vector<NodeID> topological_sorted_nodes = dfs(graph);
@@ -108,7 +125,7 @@ void GraphManager::finalize_graph(Graph &graph, GraphContext &ctx, PassManager &
     detail::call_all_const_node_accessors(graph);
 
     // Prepare graph
-    detail::prepare_all_tasks(workload);
+    // detail::prepare_all_tasks(workload);
 
     // Setup tensor memory (Allocate all tensors or setup transition manager)
     if(ctx.config().use_transition_memory_manager)
@@ -120,13 +137,17 @@ void GraphManager::finalize_graph(Graph &graph, GraphContext &ctx, PassManager &
         detail::allocate_all_tensors(graph);
     }
 
+    // Prepare graph
+    detail::prepare_all_tasks(workload);
+
     // Finalize Graph context
     ctx.finalize();
     
-    // Register graph
-    _workloads.insert(std::make_pair(graph.id(), std::move(workload)));
     std::once_flag flag;
     std::call_once(flag, detail::dump_graph_info, workload);
+    // Register graph
+    _workloads.insert(std::make_pair(graph.id(), std::move(workload)));
+    
     ARM_COMPUTE_LOG_GRAPH_VERBOSE("Created workload for graph with ID : " << graph.id() << std::endl);
 }
 
@@ -149,7 +170,8 @@ void GraphManager::execute_graph(Graph &graph)
         if(execution_type == ExecutionType::EXECUTION_TYPE_DEFAULT
             || execution_type == ExecutionType::EXECUTION_TYPE_SERIAL_HYBRID){
             detail::call_all_tasks(it->second);
-        }else if(execution_type == ExecutionType::EXECUTION_TYPE_PARALLEL){
+        }else if(execution_type == ExecutionType::EXECUTION_TYPE_PARALLEL
+            || execution_type == ExecutionType::EXECUTION_TYPE_ULAYER){
             detail::call_all_tasks_parallel(it->second);
         }
         
@@ -166,8 +188,8 @@ void GraphManager::execute_graph(Graph &graph, int loop_count)
     // Check if graph is finalized
     auto it = _workloads.find(graph.id());
     ARM_COMPUTE_ERROR_ON_MSG(it == std::end(_workloads), "Graph is not registered!");
-    std::once_flag flag;
-    std::call_once(flag, detail::dump_graph_info, it->second);
+    // std::once_flag flag;
+    // std::call_once(flag, detail::dump_graph_info, it->second);
     if(loop_count <= 0){
         return;
     }
@@ -183,7 +205,8 @@ void GraphManager::execute_graph(Graph &graph, int loop_count)
         if(execution_type == ExecutionType::EXECUTION_TYPE_DEFAULT
             || execution_type == ExecutionType::EXECUTION_TYPE_SERIAL_HYBRID){
             detail::call_all_tasks(it->second);
-        }else if(execution_type == ExecutionType::EXECUTION_TYPE_PARALLEL){
+        }else if(execution_type == ExecutionType::EXECUTION_TYPE_PARALLEL
+            || execution_type == ExecutionType::EXECUTION_TYPE_ULAYER){
             detail::call_all_tasks_parallel(it->second);
         }
         printf("End warm up\n");
@@ -200,7 +223,8 @@ void GraphManager::execute_graph(Graph &graph, int loop_count)
                 detail::call_all_tasks(it->second);
                 clock_array[i+1] = std::chrono::steady_clock::now();
             }
-        }else if(execution_type == ExecutionType::EXECUTION_TYPE_PARALLEL){
+        }else if(execution_type == ExecutionType::EXECUTION_TYPE_PARALLEL
+           || execution_type == ExecutionType::EXECUTION_TYPE_ULAYER){
             for(int i=0; i<loop_count; ++i){
                 detail::call_all_tasks_parallel(it->second);
                 clock_array[i+1] = std::chrono::steady_clock::now();

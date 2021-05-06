@@ -34,13 +34,19 @@ ICLTensor::ICLTensor()
 
 void ICLTensor::map(cl::CommandQueue &q, bool blocking)
 {
-    _mapping = do_map(q, blocking);
+    if(_mapped == false){
+        _mapping = do_map(q, blocking);
+        _mapped = (true);
+    }
 }
 
 void ICLTensor::unmap(cl::CommandQueue &q)
 {
-    do_unmap(q);
-    _mapping = nullptr;
+    if(_mapped == true){
+        do_unmap(q);
+        _mapping = nullptr;
+        _mapped = (false);
+    }
 }
 
 void ICLTensor::clear(cl::CommandQueue &q)

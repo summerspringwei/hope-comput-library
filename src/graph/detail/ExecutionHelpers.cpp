@@ -161,9 +161,11 @@ ExecutionWorkload configure_all_nodes(Graph &g, GraphContext &ctx, const std::ve
             Target                     assigned_target = node->assigned_target();
             backends::IDeviceBackend &backend         = backends::BackendRegistry::get().get_backend(assigned_target);
             std::unique_ptr<IFunction> func            = backend.configure_node(*node, ctx);
+            ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("Configure %s\n", node->name().c_str());
             if(func != nullptr || is_utility_node(node))
             {
                 workload.tasks.emplace_back(ExecutionTask(std::move(func), node));
+                
             }
         }
     }
@@ -203,6 +205,7 @@ void call_tensor_accessor(Tensor *tensor)
     tensor->call_accessor();
 }
 
+
 void call_all_const_node_accessors(Graph &g)
 {
     auto &nodes = g.nodes();
@@ -230,15 +233,7 @@ bool call_all_input_node_accessors(ExecutionWorkload &workload)
     return is_valid;
 }
 
-void prepare_all_tasks(ExecutionWorkload &workload)
-{
-    ARM_COMPUTE_ERROR_ON(workload.graph == nullptr);
-    for(auto &task : workload.tasks)
-    {
-        task.prepare();
-        release_unused_tensors(*workload.graph);
-    }
-}
+
 /**Map all the input and output tensors
  * @param[in] node: The node to map tensors
 */
@@ -250,9 +245,15 @@ int map_node(INode *node){
             continue;
         }
         if(edge->tensor()->desc().target != node->assigned_target()){
+            ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("map input tensor id :%d buff: %p is subtensor: %d tensor target: %s node name %s target: %s\n", 
+                edge->tensor()->id(),
+                (void*)(edge->tensor()->handle()->tensor().buffer()),
+                edge->tensor()->handle()->is_subtensor(),
+                get_target_string(edge->tensor()->desc().target).c_str(), 
+                node->name().c_str(),
+                get_target_string(node->assigned_target()).c_str());
             edge->tensor()->handle()->map(true);
-            count++;
-            ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("map in %p\n", (void*)(edge->tensor()->handle()->tensor().buffer()));
+            count++;            
         }
     }
     for(auto edge_idx: node->output_edges()){
@@ -261,9 +262,16 @@ int map_node(INode *node){
             continue;
         }
         if(edge->tensor()->desc().target != node->assigned_target()){
+            ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("map output tensor id:%d buff: %p is subtensor: %d tensor target: %s node name %s target: %s\n", 
+                edge->tensor()->id(),
+                (void*)(edge->tensor()->handle()->tensor().buffer()),
+                edge->tensor()->handle()->is_subtensor(),
+                get_target_string(edge->tensor()->desc().target).c_str(), 
+                node->name().c_str(),
+                get_target_string(node->assigned_target()).c_str());
             edge->tensor()->handle()->map(true);
             count++;
-            ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("map out %p\n", (void*)(edge->tensor()->handle()->tensor().buffer()));
+            
         }
     }
     return count;
@@ -277,7 +285,13 @@ int unmap_node(INode *node){
             continue;
         }
         if(edge->tensor()->desc().target != node->assigned_target()){
-            ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("unmap in %p\n", (void*)(edge->tensor()->handle()->tensor().buffer()));
+            ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("unmap input tensor id :%d buff: %p is subtensor: %d tensor target: %s node name %s target: %s\n", 
+                edge->tensor()->id(),
+                (void*)(edge->tensor()->handle()->tensor().buffer()),
+                edge->tensor()->handle()->is_subtensor(),
+                get_target_string(edge->tensor()->desc().target).c_str(), 
+                node->name().c_str(),
+                get_target_string(node->assigned_target()).c_str());
             edge->tensor()->handle()->unmap();
             count++;
         }
@@ -288,12 +302,36 @@ int unmap_node(INode *node){
             continue;
         }
         if(edge->tensor()->desc().target != node->assigned_target()){
-            ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("unmap in %p\n", (void*)(edge->tensor()->handle()->tensor().buffer()));
+            ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("unmap output tensor id :%d buff: %p is subtensor: %d tensor target: %s node name %s target: %s\n", 
+                edge->tensor()->id(),
+                (void*)(edge->tensor()->handle()->tensor().buffer()),
+                edge->tensor()->handle()->is_subtensor(),
+                get_target_string(edge->tensor()->desc().target).c_str(), 
+                node->name().c_str(),
+                get_target_string(node->assigned_target()).c_str());
             edge->tensor()->handle()->unmap();
             count++;
         }
     }
     return count;
+}
+
+
+void prepare_all_tasks(ExecutionWorkload &workload)
+{
+    ARM_COMPUTE_ERROR_ON(workload.graph == nullptr);
+    for(auto &task : workload.tasks)
+    {
+        printf("prepare: %s %d\n", task.node->name().c_str(), task.node->type());
+        // Here we only need to map the weight tensor
+        if(task.node->type()==NodeType::Const || task.node->type()==NodeType::DepthwiseConvolutionLayer)
+        map_node(task.node);
+        task.prepare();
+        if(task.node->type()==NodeType::Const)
+        unmap_node(task.node);
+        release_unused_tensors(*workload.graph);
+        printf("pfinish: %s\n", task.node->name().c_str());
+    }
 }
 
 
@@ -356,12 +394,12 @@ void call_all_tasks(ExecutionWorkload &workload)
     }
 }
 
-bool ready_to_execute(ExecutionTask &task){
-    auto node_ptr = task.node;
+bool ready_to_execute(INode* node_ptr){
     if(node_ptr == nullptr){
         ARM_COMPUTE_ERROR_ON("Task's node ptr is null\n");
         return false;
     }
+    
     for(auto edge_idx: node_ptr->input_edges()){
         auto edge = node_ptr->graph()->edge(edge_idx);
         if(edge == nullptr){
@@ -371,14 +409,25 @@ bool ready_to_execute(ExecutionTask &task){
         if(edge->producer() == nullptr){
             continue;
         }
-        if(edge->producer()->type() == NodeType::Const || edge->producer()->type() == NodeType::Input){
+        if(edge->producer()->type() == NodeType::Const 
+            || edge->producer()->type() == NodeType::Input){
             continue;
+        }if(edge->producer()->type() == NodeType::SplitLayer){
+            // For parent being SplitLayer, we need to call recursively
+            // to find whether all of it's precedence are executed
+            if(!ready_to_execute(edge->producer())){
+                return false;
+            }
         }
         if(!(edge->producer()->executed())){
             ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("%s precedent %s is not ready\n", 
                 node_ptr->name().c_str(), edge->producer()->name().c_str());
             return false;
         }
+    }
+    // All of it's precedence are executed
+    if(node_ptr->type()==NodeType::SplitLayer){
+        node_ptr->set_executed(true);
     }
     return true;
 }
@@ -425,7 +474,7 @@ void run(std::vector<ExecutionTask*>& device_tasks,
                 if(count > 10){
                     break;
                 }
-                if(ready_to_execute(*task)){
+                if(ready_to_execute(task->node)){
                     ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("%s in %s is ready\n", task->node->name().c_str(), forward_str.c_str());
                     find_ready_task = true;
                     current_task = task;
@@ -470,13 +519,15 @@ void run(std::vector<ExecutionTask*>& device_tasks,
             // If its successor's precessor is on CPU, then it must start as soon as possible
             for(auto edge_idx: current_task->node->output_edges()){
                 auto edge = current_task->node->graph()->edge(edge_idx);
-                if(edge->consumer()->assigned_target() == Target::NEON){
+                if(edge !=nullptr && edge->consumer()->assigned_target() == Target::NEON){
                     is_successor_on_cpu = true;
                     break;
                 }else{
                     for(auto edge_in_idx: edge->consumer()->input_edges()){
                         auto edge_in = current_task->node->graph()->edge(edge_in_idx);
-                        if(edge_in->producer() != nullptr && edge_in->producer()->assigned_target() == Target::NEON){
+                        if(edge_in != nullptr &&
+                            edge_in->producer() != nullptr &&
+                            edge_in->producer()->assigned_target() == Target::NEON){
                             is_successor_on_cpu = true;
                             break;  
                         }
@@ -528,7 +579,7 @@ void call_all_tasks_parallel(ExecutionWorkload &workload)
 {
     ARM_COMPUTE_ERROR_ON(workload.ctx == nullptr);
     auto execution_type = workload.ctx->config().execution_type;
-    if(execution_type != ExecutionType::EXECUTION_TYPE_PARALLEL){
+    if(execution_type != ExecutionType::EXECUTION_TYPE_PARALLEL && execution_type != ExecutionType::EXECUTION_TYPE_ULAYER){
         return ;
     }
     // Acquire memory for the transition buffers
@@ -554,7 +605,16 @@ void call_all_tasks_parallel(ExecutionWorkload &workload)
     }
     pthread_mutex_t fast_mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t fast_cond = PTHREAD_COND_INITIALIZER;
-
+    ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("%s\n", "----- CPU tasks-----");
+    for(auto* task: cpu_queue){
+        ARM_COMPUTE_UNUSED(task);
+        ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("%s\n", task->node->name().c_str());
+    }
+    ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("%s\n", "----- GPU tasks-----");
+    for(auto* task: gpu_queue){
+        ARM_COMPUTE_UNUSED(task);
+        ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("%s\n", task->node->name().c_str());
+    }
 // void run(std::vector<ExecutionTask*>& device_tasks, 
 //         std::vector<CallStat>& run_profile, 
 //         std::chrono::time_point<std::chrono::high_resolution_clock> workload_start,

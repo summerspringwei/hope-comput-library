@@ -91,11 +91,11 @@ ExecutionWorkload configure_all_nodes(Graph &g, GraphContext &ctx, const std::ve
 ExecutionWorkload configure_all_nodes(Graph &g, GraphContext &ctx, const std::vector<NodeID> &node_order, 
                                         std::shared_ptr<std::map<std::string, Target>> device_map);
 /** Find whether all the precedent nodes has been executed
- * @param[in]     task        Task contains the node
+ * @param[in]     node_ptr
  * 
  * @return whether the node in task has been executed
  */
-bool ready_to_execute(ExecutionTask &task);
+bool ready_to_execute(INode* node_ptr);
 
 /** Release the memory of all unused const nodes
  *

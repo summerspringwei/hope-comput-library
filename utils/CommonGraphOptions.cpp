@@ -170,7 +170,8 @@ CommonGraphOptions::CommonGraphOptions(CommandLineParser &parser)
         ExecutionType::EXECUTION_TYPE_DEFAULT,
         ExecutionType::EXECUTION_TYPE_SERIAL_HYBRID,
         ExecutionType::EXECUTION_TYPE_PARALLEL,
-        ExecutionType::EXECUTION_TYPE_BIG_LITTLE
+        ExecutionType::EXECUTION_TYPE_BIG_LITTLE,
+        ExecutionType::EXECUTION_TYPE_ULAYER
     };
 
     target      = parser.add_option<EnumOption<Target>>("target", supported_targets, Target::NEON);

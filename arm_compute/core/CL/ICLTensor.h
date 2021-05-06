@@ -112,6 +112,7 @@ protected:
 
 private:
     uint8_t *_mapping;
+    mutable bool _mapped = {false};       /**< Whether mapped */
 };
 
 using ICLImage = ICLTensor;

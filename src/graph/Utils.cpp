@@ -86,7 +86,7 @@ void force_target_to_graph(Graph &g, Target target, std::shared_ptr<std::map<std
             if(device_map_ptr != nullptr && device_map_ptr->find(node.get()->name()) != device_map_ptr->end()) {
                 auto mapped_target = device_map_ptr->at(node.get()->name());
                 node->set_assigned_target(mapped_target);// Set node target
-            }else {
+            }else if(node->assigned_target() == Target::UNSPECIFIED){// if not in device map and not set by pass manager
                 node->set_assigned_target(target);
             }
         }
@@ -136,11 +136,13 @@ void configure_graph_tensors_heterogenous(Graph &g){
                     || edge->producer()->type() == NodeType::Input)){
                     tensor_ptr->desc().target = edge->consumer()->assigned_target();
                     is_special_weight = true;
+                    printf("TensorID: %d, %s, %s\n", tensor_ptr->id(), get_target_string(tensor_ptr->desc().target).c_str(), edge->producer()->name().c_str());
                 }
             }
         }
         if(!is_special_weight){
             bool can_assign_to_neon = true;
+            std::stringstream ss;
             for(auto it=edge_indexes.begin(); it!=edge_indexes.end(); ++it){
                 auto edge = g.edge(*it);
                 if(edge==nullptr){
@@ -149,6 +151,7 @@ void configure_graph_tensors_heterogenous(Graph &g){
                 if((edge->producer() != nullptr && edge->producer()->assigned_target()==Target::CL)
                    || (edge->consumer()!=nullptr && edge->consumer()->assigned_target()==Target::CL)){
                     can_assign_to_neon = false;
+                    ss << edge->consumer()->name() + " ";
                     break;
                 }
             }
@@ -157,6 +160,7 @@ void configure_graph_tensors_heterogenous(Graph &g){
             }else{
                 tensor_ptr->desc().target = Target::CL;
             }
+            printf("TensorID: %d, %s, %s\n", tensor_ptr->id(), get_target_string(tensor_ptr->desc().target).c_str(), ss.str().c_str());
         }
     }
 }
@@ -244,11 +248,11 @@ PassManager create_default_pass_manager(Target target, const GraphConfig &cfg)
     pm.append(std::make_unique<InPlaceOperationMutator>(), !is_target_gc);
     
     // Passes that mutate backend information
-    pm.append(std::make_unique<DepthConcatSubTensorMutator>(), !is_target_gc);
-    pm.append(std::make_unique<SplitLayerSubTensorMutator>(), !is_target_gc);
+    // pm.append(std::make_unique<DepthConcatSubTensorMutator>(), !is_target_gc);
     pm.append(std::make_unique<NodeExecutionMethodMutator>());
     pm.append(std::make_unique<UlayerDepthwiseConvolutionMutator>(0.5), cfg.execution_type==ExecutionType::EXECUTION_TYPE_ULAYER);
-    
+    pm.append(std::make_unique<SplitLayerSubTensorMutator>(), !is_target_gc);
+
     return pm;
 }
 

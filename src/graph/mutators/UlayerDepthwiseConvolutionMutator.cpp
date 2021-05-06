@@ -34,21 +34,32 @@ NodeID create_ulayer_depthwise_convolution(Graph &g, const NodeParams &params, N
     // Compute splited channel number
     int device1_channel_num = input_channel * ratio;
     int device2_channel_num = input_channel - device1_channel_num;
-    NodeID                input_split        = GraphBuilder::add_split_node(g, params, input, num_splits, input_idx, {device1_channel_num, device2_channel_num});
+    NodeParams input_split_params = params;
+    input_split_params.target = Target::CL;
+    input_split_params.name.append("_input_split");
+    NodeID                input_split        = GraphBuilder::add_split_node(g, input_split_params, input, num_splits, input_idx, {device1_channel_num, device2_channel_num});
     
         // Split weights
     const TensorDescriptor weights_tensor_desc = get_tensor_descriptor(g, g.node(weights)->outputs()[0]);
-    const unsigned int     batch_idx           = get_dimension_idx(weights_tensor_desc.layout, DataLayoutDimension::BATCHES);
-    NodeID                 weights_split       = GraphBuilder::add_split_node(g, params, { weights, 0 }, num_splits, batch_idx, {device1_channel_num, device2_channel_num});
+    const unsigned int     channel_idx           = get_dimension_idx(weights_tensor_desc.layout, DataLayoutDimension::CHANNEL);
+    NodeParams weight_split_params = params;
+    weight_split_params.name.append("_weight_split");
+    weight_split_params.target = Target::CL;
+    NodeID                 weights_split       = GraphBuilder::add_split_node(g, weight_split_params, { weights, 0 }, num_splits, channel_idx, {device1_channel_num, device2_channel_num});
     // Split bias
     NodeID bias_split = EmptyNodeID;
     if(has_bias)
     {
         // Split bias
+        NodeParams bias_split_params = params;
+        bias_split_params.name.append("_bias_split");
+        bias_split_params.target = Target::CL;
         bias_split = GraphBuilder::add_split_node(g, params, { bias, 0 }, num_splits, 0, {device1_channel_num, device2_channel_num});
     }
     std::vector<NodeIdxPair> depthwise_convolution_outputs;
-    for(int i=0 ;i<num_splits; ++i){
+    std::string cpu_node_name, gpu_node_name;
+    
+    for(int i=0 ;i<num_splits; ++i) {
         NodeParams depth_conv_params = params;
         NodeID depth_conv_id = g.add_node<DepthwiseConvolutionLayerNode>(conv_info);
         g.add_connection(input_split, i, depth_conv_id, 0);
@@ -60,22 +71,28 @@ NodeID create_ulayer_depthwise_convolution(Graph &g, const NodeParams &params, N
         // Set node parameters
         auto node = g.node(depth_conv_id);
         ARM_COMPUTE_ERROR_ON(node==nullptr);
-        node->set_common_node_parameters(depth_conv_params);
         
         if(i==0) {
             depth_conv_params.name.append("_cpu");
             depth_conv_params.target = Target::NEON;
             node->set_assigned_target(Target::NEON);
+            cpu_node_name = depth_conv_params.name;
         } else {
             depth_conv_params.name.append("_gpu");
             depth_conv_params.target = Target::CL;
             node->set_assigned_target(Target::CL);
+            gpu_node_name = depth_conv_params.name;
         }
         // We omit fused activation
-
+        node->set_common_node_parameters(depth_conv_params);
         depthwise_convolution_outputs.push_back({depth_conv_id, 0});
     }
-    return GraphBuilder::add_concatenate_node(g, params, depthwise_convolution_outputs, DataLayoutDimension::CHANNEL);
+    ARM_COMPUTE_LOG_GRAPH_INFO("replace " + params.name + "to " + cpu_node_name + " & " + gpu_node_name+"\n");
+    // We set concat node to CL
+    NodeParams concat_params = params;
+    concat_params.name.append("_concat");
+    concat_params.target = Target::CL;
+    return GraphBuilder::add_concatenate_node(g, concat_params, depthwise_convolution_outputs, DataLayoutDimension::CHANNEL);
 }
 }// End of anonymous namespace
 const char *UlayerDepthwiseConvolutionMutator::name()
@@ -85,7 +102,7 @@ const char *UlayerDepthwiseConvolutionMutator::name()
 
 IGraphMutator::MutationType UlayerDepthwiseConvolutionMutator::type() const
 {
-    return IGraphMutator::MutationType::Backend;
+    return IGraphMutator::MutationType::IR;
 }
 
 void UlayerDepthwiseConvolutionMutator::mutate(Graph& g){
@@ -102,10 +119,10 @@ void UlayerDepthwiseConvolutionMutator::mutate(Graph& g){
         INode *node = g.node(i);
         if(node!=nullptr && node->type()==NodeType::DepthwiseConvolutionLayer){
             // Validate node
-            backends::IDeviceBackend &backend = backends::BackendRegistry::get().get_backend(node->assigned_target());
-            Status                    status  = backend.validate_node(*node);
+            // backends::IDeviceBackend &backend = backends::BackendRegistry::get().get_backend(node->assigned_target());
+            // Status                    status  = backend.validate_node(*node);
 
-            if(!bool(status)){
+            if(!bool(false)){
                 // Down-cast node
                 auto *depth_conv_node = arm_compute::utils::cast::polymorphic_cast<DepthwiseConvolutionLayerNode *>(node);
                 

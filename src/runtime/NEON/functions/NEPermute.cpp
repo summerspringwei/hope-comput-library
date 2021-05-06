@@ -25,6 +25,7 @@
 
 #include "arm_compute/core/Validate.h"
 #include "src/runtime/cpu/operators/CpuPermute.h"
+// #include "arm_compute/runtime/CL/CLTensor.h"
 
 namespace arm_compute
 {
@@ -49,7 +50,7 @@ NEPermute::~NEPermute() = default;
 void NEPermute::configure(const ITensor *input, ITensor *output, const PermutationVector &perm)
 {
     ARM_COMPUTE_ERROR_ON_NULLPTR(input, output);
-
+    // (arm_compute::utils::cast::polymorphic_downcast<CLTensor*>(input))->map(true);
     _impl->src = input;
     _impl->dst = output;
     _impl->op  = std::make_unique<cpu::CpuPermute>();
