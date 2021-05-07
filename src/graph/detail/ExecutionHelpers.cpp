@@ -58,9 +58,32 @@ void validate_all_nodes(Graph &g)
     {
         if(node != nullptr)
         {
+            const char * msg = node->name().empty() ? "empty": node->name().c_str();
+            printf("name: %s ", msg);
+            printf(" input tensor id: ");
+            for(auto edge_idx: node->input_edges()){
+                auto edge = node->graph()->edge(edge_idx);
+                if(edge!=nullptr)
+                printf(" %d ", edge->tensor_id());
+            }printf(" output tensor id: ");
+            
+            for(auto edge_idx: node->output_edges()){
+                auto edge = node->graph()->edge(edge_idx);
+                if(edge!=nullptr)
+                printf(" %d ", edge->tensor_id());
+            }printf("\n");
+            
             Target                    assigned_target = node->assigned_target();
             backends::IDeviceBackend &backend         = backends::BackendRegistry::get().get_backend(assigned_target);
             Status                    status          = backend.validate_node(*node);
+            if(bool(status)){
+                const char* msg = node->name().empty() ? "empty_name": node->name().c_str();
+                ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("Valide %s ok\n", msg);
+            }else{
+                const char* msg = node->name().empty() ? "empty_name": node->name().c_str();
+                ARM_COMPUTE_LOG_INFO_MSG_WITH_FORMAT_CORE("Valide %s error\n", msg);
+                continue;
+            }
             ARM_COMPUTE_ERROR_ON_MSG(!bool(status), status.error_description().c_str());
         }
     }
@@ -78,6 +101,7 @@ void configure_all_tensors(Graph &g)
             backends::IDeviceBackend      &backend = backends::BackendRegistry::get().get_backend(target);
             std::unique_ptr<ITensorHandle> handle  = backend.create_tensor(*tensor);
             ARM_COMPUTE_ERROR_ON_MSG(!handle, "Couldn't create backend handle!");
+            printf("ConfigureTensor:%d \n", tensor->id());
             tensor->set_handle(std::move(handle));
         }
     }
@@ -324,10 +348,10 @@ void prepare_all_tasks(ExecutionWorkload &workload)
     {
         printf("prepare: %s %d\n", task.node->name().c_str(), task.node->type());
         // Here we only need to map the weight tensor
-        if(task.node->type()==NodeType::Const || task.node->type()==NodeType::DepthwiseConvolutionLayer)
+        if(task.node->type()==NodeType::Const || task.node->type()==NodeType::DepthwiseConvolutionLayer || task.node->type()==NodeType::ConvolutionLayer)
         map_node(task.node);
         task.prepare();
-        if(task.node->type()==NodeType::Const)
+        if(task.node->type()==NodeType::Const || task.node->type()==NodeType::DepthwiseConvolutionLayer || task.node->type()==NodeType::ConvolutionLayer)
         unmap_node(task.node);
         release_unused_tensors(*workload.graph);
         printf("pfinish: %s\n", task.node->name().c_str());
@@ -595,7 +619,7 @@ void call_all_tasks_parallel(ExecutionWorkload &workload)
     std::chrono::time_point<std::chrono::high_resolution_clock> workload_start = std::chrono::high_resolution_clock::now();
     
     std::vector<ExecutionTask*> cpu_queue, gpu_queue;
-    for(auto &task : workload.tasks){
+    for(auto &task : workload.tasks) {
         task.node->set_executed(false);
         if(task.node->assigned_target() == Target::NEON){
             cpu_queue.push_back(&task);

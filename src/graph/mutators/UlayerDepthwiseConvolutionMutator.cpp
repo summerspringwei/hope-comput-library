@@ -31,7 +31,7 @@ NodeID create_ulayer_depthwise_convolution(Graph &g, const NodeParams &params, N
     const TensorDescriptor input_tensor_desc = get_tensor_descriptor(g, g.node(input.node_id)->outputs()[0]);
     const unsigned int     input_idx         = get_dimension_idx(input_tensor_desc.layout, DataLayoutDimension::CHANNEL);
     const unsigned int     input_channel     = input_tensor_desc.shape[input_idx];
-    // Compute splited channel number
+    // Compute splited channel size
     int device1_channel_num = input_channel * ratio;
     int device2_channel_num = input_channel - device1_channel_num;
     NodeParams input_split_params = params;
@@ -39,7 +39,7 @@ NodeID create_ulayer_depthwise_convolution(Graph &g, const NodeParams &params, N
     input_split_params.name.append("_input_split");
     NodeID                input_split        = GraphBuilder::add_split_node(g, input_split_params, input, num_splits, input_idx, {device1_channel_num, device2_channel_num});
     
-        // Split weights
+    // Split weights
     const TensorDescriptor weights_tensor_desc = get_tensor_descriptor(g, g.node(weights)->outputs()[0]);
     const unsigned int     channel_idx           = get_dimension_idx(weights_tensor_desc.layout, DataLayoutDimension::CHANNEL);
     NodeParams weight_split_params = params;
@@ -57,7 +57,6 @@ NodeID create_ulayer_depthwise_convolution(Graph &g, const NodeParams &params, N
         bias_split = GraphBuilder::add_split_node(g, params, { bias, 0 }, num_splits, 0, {device1_channel_num, device2_channel_num});
     }
     std::vector<NodeIdxPair> depthwise_convolution_outputs;
-    std::string cpu_node_name, gpu_node_name;
     
     for(int i=0 ;i<num_splits; ++i) {
         NodeParams depth_conv_params = params;
@@ -76,18 +75,16 @@ NodeID create_ulayer_depthwise_convolution(Graph &g, const NodeParams &params, N
             depth_conv_params.name.append("_cpu");
             depth_conv_params.target = Target::NEON;
             node->set_assigned_target(Target::NEON);
-            cpu_node_name = depth_conv_params.name;
         } else {
             depth_conv_params.name.append("_gpu");
             depth_conv_params.target = Target::CL;
             node->set_assigned_target(Target::CL);
-            gpu_node_name = depth_conv_params.name;
         }
         // We omit fused activation
         node->set_common_node_parameters(depth_conv_params);
         depthwise_convolution_outputs.push_back({depth_conv_id, 0});
     }
-    ARM_COMPUTE_LOG_GRAPH_INFO("replace " + params.name + "to " + cpu_node_name + " & " + gpu_node_name+"\n");
+    ARM_COMPUTE_LOG_GRAPH_INFO("replace " + params.name + " to " + params.name + "_cpu" + " & " + params.name + "_gpu\n");
     // We set concat node to CL
     NodeParams concat_params = params;
     concat_params.name.append("_concat");
@@ -119,10 +116,12 @@ void UlayerDepthwiseConvolutionMutator::mutate(Graph& g){
         INode *node = g.node(i);
         if(node!=nullptr && node->type()==NodeType::DepthwiseConvolutionLayer){
             // Validate node
+            // node->set_assigned_target(Target::CL);
             // backends::IDeviceBackend &backend = backends::BackendRegistry::get().get_backend(node->assigned_target());
             // Status                    status  = backend.validate_node(*node);
-
-            if(!bool(false)){
+            // Split if valid
+            // The logic is different for group convolution
+            if(bool(true)){
                 // Down-cast node
                 auto *depth_conv_node = arm_compute::utils::cast::polymorphic_cast<DepthwiseConvolutionLayerNode *>(node);
                 
@@ -151,16 +150,12 @@ void UlayerDepthwiseConvolutionMutator::mutate(Graph& g){
                 {
                     g.add_connection(ulayer_depth_conv_id, 0, driving_node.node_id, driving_node.index);
                 }
-                // // Current max tensor and node id
-                // TensorID latest_tid = g.tensors().size();
-                // NodeID   latest_nid = g.nodes().size();
 
                 // Update accessor to batch normalization node
                 g.node(ulayer_depth_conv_id)->output(0)->set_accessor(std::move(node_accessor));
 
                 // we have config node target in create_ulayer_depthwise_convolution
                 // We will configure the tensor after the pass manager
-
             }
         }
     }

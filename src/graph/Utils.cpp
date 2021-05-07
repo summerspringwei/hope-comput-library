@@ -250,7 +250,9 @@ PassManager create_default_pass_manager(Target target, const GraphConfig &cfg)
     // Passes that mutate backend information
     // pm.append(std::make_unique<DepthConcatSubTensorMutator>(), !is_target_gc);
     pm.append(std::make_unique<NodeExecutionMethodMutator>());
+    pm.append(std::make_unique<UlayerConvolutionMutator>(0.5), cfg.execution_type==ExecutionType::EXECUTION_TYPE_ULAYER);
     pm.append(std::make_unique<UlayerDepthwiseConvolutionMutator>(0.5), cfg.execution_type==ExecutionType::EXECUTION_TYPE_ULAYER);
+
     pm.append(std::make_unique<SplitLayerSubTensorMutator>(), !is_target_gc);
 
     return pm;

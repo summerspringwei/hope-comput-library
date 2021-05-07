@@ -32,5 +32,6 @@
 #include "arm_compute/graph/mutators/SplitLayerSubTensorMutator.h"
 #include "arm_compute/graph/mutators/SyntheticDataTypeMutator.h"
 #include "arm_compute/graph/mutators/UlayerDepthwiseConvolutionMutator.h"
+#include "arm_compute/graph/mutators/UlayerConvolutionMutator.h"
 
 #endif /* ARM_COMPUTE_GRAPH_GRAPH_MUTATORS_H */

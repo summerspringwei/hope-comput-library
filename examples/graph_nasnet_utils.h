@@ -7,6 +7,7 @@
 #include "utils/GraphUtils.h"
 #include "utils/Utils.h"
 #include "arm_compute/core/Log.h"
+#include "arm_compute/graph/Utils.h"
 
 using namespace arm_compute::utils;
 using namespace arm_compute::graph::frontend;
@@ -120,6 +121,19 @@ TensorShape get_tail_shape(std::shared_ptr<SubStream> layer){
     return node->output(0)->desc().shape;
 }
 
+TensorDescriptor get_tail_output_desc(std::shared_ptr<SubStream> layer){
+    if(layer == nullptr){
+        return TensorDescriptor();
+    }
+    auto node = layer->graph().node(layer->tail_node());
+    if(node==nullptr || node->num_outputs() < 1){
+        return TensorDescriptor();
+    }
+    ARM_COMPUTE_ERROR_ON(node->output(0)->desc().layout != DataLayout::NCHW);
+    return node->output(0)->desc();
+}
+
+
 // size_t get_layer_shape_channel()
 
 void print_tensor_shape(TensorShape shape){
@@ -212,6 +226,7 @@ public:
         graph = std::shared_ptr<SubStream>(new SubStream(*graph));
         // Assume NCHW
         int input_filters = get_tail_shape(graph)[2];
+        ARM_COMPUTE_ERROR_ON(get_dimension_size(get_tail_output_desc(graph), DataLayoutDimension::CHANNEL) != (size_t)input_filters);
         ARM_COMPUTE_ERROR_ON(input_filters==0);
         auto filter_size = this->_filter_size;
         if(operation.find("separable", 0) != std::string::npos){
@@ -248,8 +263,10 @@ public:
         std::vector<int> used_hiddenstates = _used_hiddenstates;
         // We assume tensor in NCHW format
         auto final_height = get_tail_shape(net.back())[0];
+        ARM_COMPUTE_ERROR_ON(get_dimension_size(get_tail_output_desc(net.back()), DataLayoutDimension::HEIGHT) != (size_t)final_height);
         ARM_COMPUTE_ERROR_ON(final_height==0);
         auto final_num_filters = get_tail_shape(net.back())[2];
+        ARM_COMPUTE_ERROR_ON(get_dimension_size(get_tail_output_desc(net.back()), DataLayoutDimension::CHANNEL) != (size_t)final_num_filters);
         ARM_COMPUTE_ERROR_ON(final_num_filters == 0);
         assert(net.size() == used_hiddenstates.size());
         

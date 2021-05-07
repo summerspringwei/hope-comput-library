@@ -97,7 +97,6 @@ void GraphManager::finalize_graph(Graph &graph, GraphContext &ctx, PassManager &
         auto &nodes = graph.nodes();
         for(auto& node: nodes) {
             if(node){
-                
                 if(node->type()!=NodeType::Const && node->type()!=NodeType::Input)
                 ARM_COMPUTE_LOG_GRAPH_INFO(node->name() + " " + get_target_string(node->assigned_target()));
             }
